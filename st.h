@@ -77,33 +77,61 @@ typedef union {
 	const char *s;
 } Arg;
 
+typedef struct {
+	Glyph attr; /* current char attributes */
+	int x;
+	int y;
+	char state;
+} TCursor;
+
+/* Internal representation of the screen */
+typedef struct {
+	int row;      /* nb row */
+	int col;      /* nb col */
+	Line *line;   /* screen */
+	Line *alt;    /* alternate screen */
+	int *dirty;   /* dirtyness of lines */
+	TCursor c;    /* cursor */
+	int ocx;      /* old cursor col */
+	int ocy;      /* old cursor row */
+	int top;      /* top    scroll limit */
+	int bot;      /* bottom scroll limit */
+	int mode;     /* terminal mode flags */
+	int esc;      /* escape state flags */
+	char trantbl[4]; /* charset table translation */
+	int charset;  /* current charset */
+	int icharset; /* selected charset for sequence */
+	int *tabs;
+	Rune lastc;   /* last printed char outside of sequence, 0 if control */
+} Term;
+
 void die(const char *, ...);
-void redraw(void);
-void draw(void);
+void tredraw(Term *);
+void tdraw(Term *);
 
-void printscreen(const Arg *);
-void printsel(const Arg *);
+void printscreen(Term *, const Arg *);
+void printsel(Term *, const Arg *);
 void sendbreak(const Arg *);
-void toggleprinter(const Arg *);
+void toggleprinter(Term *, const Arg *);
 
-int tattrset(int);
-void tnew(int, int);
-void tresize(int, int);
-void tsetdirtattr(int);
-void ttyhangup(void);
-int ttynew(char *, char *, char *, char **);
-size_t ttyread(void);
-void ttyresize(int, int);
-void ttywrite(const char *, size_t, int);
+int tattrset(Term *, int);
+void tnew(Term *, int, int);
+void tresize(Term *, int, int);
+void tsetdirtattr(Term *, int);
+void ttyhangup(Term *);
+int ttynew(Term *, char *, char *, char *, char **);
+size_t ttyread(Term *);
+void ttyresize(Term *, int, int);
+void ttywrite(Term *, const char *, size_t, int);
 
 void resettitle(void);
 
-void selclear(void);
-void selinit(void);
-void selstart(int, int, int);
-void selextend(int, int, int, int);
-int selected(int, int);
-char *getsel(void);
+void selclear(Term *);
+void selinit(Term *);
+void selstart(Term *, int, int, int);
+void selextend(Term *, int, int, int, int);
+int selected(Term *, int, int);
+char *getsel(Term *);
 
 size_t utf8encode(Rune, char *);
 

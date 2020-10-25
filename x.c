@@ -220,6 +220,7 @@ static DC dc;
 static XWindow xw;
 static XSelection xsel;
 static TermWindow win;
+static Term term;
 
 /* Font Ring Cache */
 enum {
@@ -307,7 +308,7 @@ zoomabs(const Arg *arg)
 	xunloadfonts();
 	xloadfonts(usedfont, arg->f);
 	cresize(0, 0);
-	redraw();
+	tredraw(&term);
 	xhints();
 }
 
@@ -325,7 +326,7 @@ zoomreset(const Arg *arg)
 void
 ttysend(const Arg *arg)
 {
-	ttywrite(arg->s, strlen(arg->s), 1);
+	ttywrite(&term, arg->s, strlen(arg->s), 1);
 }
 
 int
@@ -356,9 +357,9 @@ mousesel(XEvent *e, int done)
 			break;
 		}
 	}
-	selextend(evcol(e), evrow(e), seltype, done);
+	selextend(&term, evcol(e), evrow(e), seltype, done);
 	if (done)
-		setsel(getsel(), e->xbutton.time);
+		setsel(getsel(&term), e->xbutton.time);
 }
 
 void
@@ -421,7 +422,7 @@ mousereport(XEvent *e)
 		return;
 	}
 
-	ttywrite(buf, len, 0);
+	ttywrite(&term, buf, len, 0);
 }
 
 uint
@@ -486,7 +487,7 @@ bpress(XEvent *e)
 		xsel.tclick2 = xsel.tclick1;
 		xsel.tclick1 = now;
 
-		selstart(evcol(e), evrow(e), snap);
+		selstart(&term, evcol(e), evrow(e), snap);
 	}
 }
 
@@ -575,10 +576,10 @@ selnotify(XEvent *e)
 		}
 
 		if (IS_SET(MODE_BRCKTPASTE) && ofs == 0)
-			ttywrite("\033[200~", 6, 0);
-		ttywrite((char *)data, nitems * format / 8, 1);
+			ttywrite(&term, "\033[200~", 6, 0);
+		ttywrite(&term, (char *)data, nitems * format / 8, 1);
 		if (IS_SET(MODE_BRCKTPASTE) && rem == 0)
-			ttywrite("\033[201~", 6, 0);
+			ttywrite(&term, "\033[201~", 6, 0);
 		XFree(data);
 		/* number of 32-bit chunks returned */
 		ofs += nitems * format / 32;
@@ -600,7 +601,7 @@ xclipcopy(void)
 void
 selclear_(XEvent *e)
 {
-	selclear();
+	selclear(&term);
 }
 
 void
@@ -672,7 +673,7 @@ setsel(char *str, Time t)
 
 	XSetSelectionOwner(xw.dpy, XA_PRIMARY, xw.win, t);
 	if (XGetSelectionOwner(xw.dpy, XA_PRIMARY) != xw.win)
-		selclear();
+		selclear(&term);
 }
 
 void
@@ -721,9 +722,9 @@ cresize(int width, int height)
 	col = MAX(1, col);
 	row = MAX(1, row);
 
-	tresize(col, row);
+	tresize(&term, col, row);
 	xresize(col, row);
-	ttyresize(win.tw, win.th);
+	ttyresize(&term, win.tw, win.th);
 }
 
 void
@@ -1491,7 +1492,7 @@ xdrawcursor(int cx, int cy, Glyph g, int ox, int oy, Glyph og)
 	Color drawcol;
 
 	/* remove the old cursor */
-	if (selected(ox, oy))
+	if (selected(&term, ox, oy))
 		og.mode ^= ATTR_REVERSE;
 	xdrawglyph(og, ox, oy);
 
@@ -1506,7 +1507,7 @@ xdrawcursor(int cx, int cy, Glyph g, int ox, int oy, Glyph og)
 	if (IS_SET(MODE_REVERSE)) {
 		g.mode |= ATTR_REVERSE;
 		g.bg = defaultfg;
-		if (selected(cx, cy)) {
+		if (selected(&term, cx, cy)) {
 			drawcol = dc.col[defaultcs];
 			g.fg = defaultrcs;
 		} else {
@@ -1514,7 +1515,7 @@ xdrawcursor(int cx, int cy, Glyph g, int ox, int oy, Glyph og)
 			g.fg = defaultcs;
 		}
 	} else {
-		if (selected(cx, cy)) {
+		if (selected(&term, cx, cy)) {
 			g.fg = defaultfg;
 			g.bg = defaultrcs;
 		} else {
@@ -1625,7 +1626,7 @@ xdrawline(Line line, int x1, int y1, int x2)
 		new = line[x];
 		if (new.mode == ATTR_WDUMMY)
 			continue;
-		if (selected(x, y1))
+		if (selected(&term, x, y1))
 			new.mode ^= ATTR_REVERSE;
 		if (i > 0 && ATTRCMP(base, new)) {
 			xdrawglyphfontspecs(specs, base, i, ox, y1);
@@ -1668,7 +1669,7 @@ xximspot(int x, int y)
 void
 expose(XEvent *ev)
 {
-	redraw();
+	tredraw(&term);
 }
 
 void
@@ -1698,7 +1699,7 @@ xsetmode(int set, unsigned int flags)
 	int mode = win.mode;
 	MODBIT(win.mode, set, flags);
 	if ((win.mode & MODE_REVERSE) != (mode & MODE_REVERSE))
-		redraw();
+		tredraw(&term);
 }
 
 int
@@ -1743,13 +1744,13 @@ focus(XEvent *ev)
 		win.mode |= MODE_FOCUSED;
 		xseturgency(0);
 		if (IS_SET(MODE_FOCUS))
-			ttywrite("\033[I", 3, 0);
+			ttywrite(&term, "\033[I", 3, 0);
 	} else {
 		if (xw.ime.xic)
 			XUnsetICFocus(xw.ime.xic);
 		win.mode &= ~MODE_FOCUSED;
 		if (IS_SET(MODE_FOCUS))
-			ttywrite("\033[O", 3, 0);
+			ttywrite(&term, "\033[O", 3, 0);
 	}
 }
 
@@ -1824,7 +1825,7 @@ kpress(XEvent *ev)
 
 	/* 2. custom keys from config.h */
 	if ((customkey = kmap(ksym, e->state))) {
-		ttywrite(customkey, strlen(customkey), 1);
+		ttywrite(&term, customkey, strlen(customkey), 1);
 		return;
 	}
 
@@ -1843,7 +1844,7 @@ kpress(XEvent *ev)
 			len = 2;
 		}
 	}
-	ttywrite(buf, len, 1);
+	ttywrite(&term, buf, len, 1);
 }
 
 void
@@ -1861,7 +1862,7 @@ cmessage(XEvent *e)
 			win.mode &= ~MODE_FOCUSED;
 		}
 	} else if (e->xclient.data.l[0] == xw.wmdeletewin) {
-		ttyhangup();
+		ttyhangup(&term);
 		exit(0);
 	}
 }
@@ -1901,7 +1902,7 @@ run(void)
 		}
 	} while (ev.type != MapNotify);
 
-	ttyfd = ttynew(opt_line, shell, opt_io, opt_cmd);
+	ttyfd = ttynew(&term, opt_line, shell, opt_io, opt_cmd);
 	cresize(w, h);
 
 	for (timeout = -1, drawing = 0, lastblink = (struct timespec){0};;) {
@@ -1924,7 +1925,7 @@ run(void)
 		clock_gettime(CLOCK_MONOTONIC, &now);
 
 		if (FD_ISSET(ttyfd, &rfd))
-			ttyread();
+			ttyread(&term);
 
 		xev = 0;
 		while (XPending(xw.dpy)) {
@@ -1960,19 +1961,19 @@ run(void)
 
 		/* idle detected or maxlatency exhausted -> draw */
 		timeout = -1;
-		if (blinktimeout && tattrset(ATTR_BLINK)) {
+		if (blinktimeout && tattrset(&term, ATTR_BLINK)) {
 			timeout = blinktimeout - TIMEDIFF(now, lastblink);
 			if (timeout <= 0) {
 				if (-timeout > blinktimeout) /* start visible */
 					win.mode |= MODE_BLINK;
 				win.mode ^= MODE_BLINK;
-				tsetdirtattr(ATTR_BLINK);
+				tsetdirtattr(&term, ATTR_BLINK);
 				lastblink = now;
 				timeout = blinktimeout;
 			}
 		}
 
-		draw();
+		tdraw(&term);
 		XFlush(xw.dpy);
 		drawing = 0;
 	}
@@ -2053,10 +2054,10 @@ run:
 	XSetLocaleModifiers("");
 	cols = MAX(cols, 1);
 	rows = MAX(rows, 1);
-	tnew(cols, rows);
+	tnew(&term, cols, rows);
 	xinit(cols, rows);
 	xsetenv();
-	selinit();
+	selinit(&term);
 	run();
 
 	return 0;
