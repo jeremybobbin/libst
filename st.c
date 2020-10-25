@@ -84,24 +84,6 @@ enum escape_state {
 	ESC_UTF8       = 64,
 };
 
-typedef struct {
-	int mode;
-	int type;
-	int snap;
-	/*
-	 * Selection variables:
-	 * nb – normalized coordinates of the beginning of the selection
-	 * ne – normalized coordinates of the end of the selection
-	 * ob – original coordinates of the beginning of the selection
-	 * oe – original coordinates of the end of the selection
-	 */
-	struct {
-		int x, y;
-	} nb, ne, ob, oe;
-
-	int alt;
-} Selection;
-
 /* CSI Escape sequence structs */
 /* ESC '[' [[ [<priv>] <arg> [;]] <mode> [<mode>]] */
 typedef struct {
@@ -139,7 +121,6 @@ static void strparse(void);
 static void strreset(void);
 
 static void tprinter(Term *, char *, size_t);
-static void tdumpsel(Term *);
 static void tdumpline(Term *, int);
 static void tdump(Term *);
 static void tclearregion(Term *, int, int, int, int);
@@ -174,10 +155,6 @@ static void tstrsequence(Term *, uchar);
 
 static void drawregion(Term *, int, int, int, int);
 
-static void selnormalize(Term *);
-static void selscroll(Term *, int, int);
-static void selsnap(Term *, int *, int *, int);
-
 static size_t utf8decode(const char *, Rune *, size_t);
 static Rune utf8decodebyte(char, size_t *);
 static char utf8encodebyte(Rune, size_t);
@@ -189,7 +166,6 @@ static char base64dec_getc(const char **);
 static ssize_t xwrite(int, const char *, size_t);
 
 /* Globals */
-static Selection sel;
 static CSIEscape csiescseq;
 static STREscape strescseq;
 static int iofd = 1;
@@ -371,14 +347,6 @@ base64dec(const char *src)
 	return result;
 }
 
-void
-selinit(Term *term)
-{
-	sel.mode = SEL_IDLE;
-	sel.snap = 0;
-	sel.ob.x = -1;
-}
-
 int
 tlinelen(Term *term, int y)
 {
@@ -391,233 +359,6 @@ tlinelen(Term *term, int y)
 		--i;
 
 	return i;
-}
-
-void
-selstart(Term *term, int col, int row, int snap)
-{
-	selclear(term);
-	sel.mode = SEL_EMPTY;
-	sel.type = SEL_REGULAR;
-	sel.alt = IS_SET(MODE_ALTSCREEN);
-	sel.snap = snap;
-	sel.oe.x = sel.ob.x = col;
-	sel.oe.y = sel.ob.y = row;
-	selnormalize(term);
-
-	if (sel.snap != 0)
-		sel.mode = SEL_READY;
-	tsetdirt(term, sel.nb.y, sel.ne.y);
-}
-
-void
-selextend(Term *term, int col, int row, int type, int done)
-{
-	int oldey, oldex, oldsby, oldsey, oldtype;
-
-	if (sel.mode == SEL_IDLE)
-		return;
-	if (done && sel.mode == SEL_EMPTY) {
-		selclear(term);
-		return;
-	}
-
-	oldey = sel.oe.y;
-	oldex = sel.oe.x;
-	oldsby = sel.nb.y;
-	oldsey = sel.ne.y;
-	oldtype = sel.type;
-
-	sel.oe.x = col;
-	sel.oe.y = row;
-	selnormalize(term);
-	sel.type = type;
-
-	if (oldey != sel.oe.y || oldex != sel.oe.x || oldtype != sel.type || sel.mode == SEL_EMPTY)
-		tsetdirt(term, MIN(sel.nb.y, oldsby), MAX(sel.ne.y, oldsey));
-
-	sel.mode = done ? SEL_IDLE : SEL_READY;
-}
-
-void
-selnormalize(Term *term)
-{
-	int i;
-
-	if (sel.type == SEL_REGULAR && sel.ob.y != sel.oe.y) {
-		sel.nb.x = sel.ob.y < sel.oe.y ? sel.ob.x : sel.oe.x;
-		sel.ne.x = sel.ob.y < sel.oe.y ? sel.oe.x : sel.ob.x;
-	} else {
-		sel.nb.x = MIN(sel.ob.x, sel.oe.x);
-		sel.ne.x = MAX(sel.ob.x, sel.oe.x);
-	}
-	sel.nb.y = MIN(sel.ob.y, sel.oe.y);
-	sel.ne.y = MAX(sel.ob.y, sel.oe.y);
-
-	selsnap(term, &sel.nb.x, &sel.nb.y, -1);
-	selsnap(term, &sel.ne.x, &sel.ne.y, +1);
-
-	/* expand selection over line breaks */
-	if (sel.type == SEL_RECTANGULAR)
-		return;
-	i = tlinelen(term, sel.nb.y);
-	if (i < sel.nb.x)
-		sel.nb.x = i;
-	if (tlinelen(term, sel.ne.y) <= sel.ne.x)
-		sel.ne.x = term->col - 1;
-}
-
-int
-selected(Term *term, int x, int y)
-{
-	if (sel.mode == SEL_EMPTY || sel.ob.x == -1 ||
-			sel.alt != IS_SET(MODE_ALTSCREEN))
-		return 0;
-
-	if (sel.type == SEL_RECTANGULAR)
-		return BETWEEN(y, sel.nb.y, sel.ne.y)
-		    && BETWEEN(x, sel.nb.x, sel.ne.x);
-
-	return BETWEEN(y, sel.nb.y, sel.ne.y)
-	    && (y != sel.nb.y || x >= sel.nb.x)
-	    && (y != sel.ne.y || x <= sel.ne.x);
-}
-
-void
-selsnap(Term *term, int *x, int *y, int direction)
-{
-	int newx, newy, xt, yt;
-	int delim, prevdelim;
-	Glyph *gp, *prevgp;
-
-	switch (sel.snap) {
-	case SNAP_WORD:
-		/*
-		 * Snap around if the word wraps around at the end or
-		 * beginning of a line.
-		 */
-		prevgp = &term->line[*y][*x];
-		prevdelim = ISDELIM(prevgp->u);
-		for (;;) {
-			newx = *x + direction;
-			newy = *y;
-			if (!BETWEEN(newx, 0, term->col - 1)) {
-				newy += direction;
-				newx = (newx + term->col) % term->col;
-				if (!BETWEEN(newy, 0, term->row - 1))
-					break;
-
-				if (direction > 0)
-					yt = *y, xt = *x;
-				else
-					yt = newy, xt = newx;
-				if (!(term->line[yt][xt].mode & ATTR_WRAP))
-					break;
-			}
-
-			if (newx >= tlinelen(term, newy))
-				break;
-
-			gp = &term->line[newy][newx];
-			delim = ISDELIM(gp->u);
-			if (!(gp->mode & ATTR_WDUMMY) && (delim != prevdelim
-					|| (delim && gp->u != prevgp->u)))
-				break;
-
-			*x = newx;
-			*y = newy;
-			prevgp = gp;
-			prevdelim = delim;
-		}
-		break;
-	case SNAP_LINE:
-		/*
-		 * Snap around if the the previous line or the current one
-		 * has set ATTR_WRAP at its end. Then the whole next or
-		 * previous line will be selected.
-		 */
-		*x = (direction < 0) ? 0 : term->col - 1;
-		if (direction < 0) {
-			for (; *y > 0; *y += direction) {
-				if (!(term->line[*y-1][term->col-1].mode
-						& ATTR_WRAP)) {
-					break;
-				}
-			}
-		} else if (direction > 0) {
-			for (; *y < term->row-1; *y += direction) {
-				if (!(term->line[*y][term->col-1].mode
-						& ATTR_WRAP)) {
-					break;
-				}
-			}
-		}
-		break;
-	}
-}
-
-char *
-getsel(Term *term)
-{
-	char *str, *ptr;
-	int y, bufsize, lastx, linelen;
-	Glyph *gp, *last;
-
-	if (sel.ob.x == -1)
-		return NULL;
-
-	bufsize = (term->col+1) * (sel.ne.y-sel.nb.y+1) * UTF_SIZ;
-	ptr = str = xmalloc(bufsize);
-
-	/* append every set & selected glyph to the selection */
-	for (y = sel.nb.y; y <= sel.ne.y; y++) {
-		if ((linelen = tlinelen(term, y)) == 0) {
-			*ptr++ = '\n';
-			continue;
-		}
-
-		if (sel.type == SEL_RECTANGULAR) {
-			gp = &term->line[y][sel.nb.x];
-			lastx = sel.ne.x;
-		} else {
-			gp = &term->line[y][sel.nb.y == y ? sel.nb.x : 0];
-			lastx = (sel.ne.y == y) ? sel.ne.x : term->col-1;
-		}
-		last = &term->line[y][MIN(lastx, linelen-1)];
-		while (last >= gp && last->u == ' ')
-			--last;
-
-		for ( ; gp <= last; ++gp) {
-			if (gp->mode & ATTR_WDUMMY)
-				continue;
-
-			ptr += utf8encode(gp->u, ptr);
-		}
-
-		/*
-		 * Copy and pasting of line endings is inconsistent
-		 * in the inconsistent terminal and GUI world.
-		 * The best solution seems like to produce '\n' when
-		 * something is copied from st and convert '\n' to
-		 * '\r', when something to be pasted is received by
-		 * st.
-		 * FIXME: Fix the computer world.
-		 */
-		if ((y < sel.ne.y || lastx >= linelen) && !(last->mode & ATTR_WRAP))
-			*ptr++ = '\n';
-	}
-	*ptr = 0;
-	return str;
-}
-
-void
-selclear(Term *term)
-{
-	if (sel.ob.x == -1)
-		return;
-	sel.mode = SEL_IDLE;
-	sel.ob.x = -1;
-	tsetdirt(term, sel.nb.y, sel.ne.y);
 }
 
 void
@@ -1012,7 +753,6 @@ tscrolldown(Term *term, int orig, int n)
 		term->line[i-n] = temp;
 	}
 
-	selscroll(term, orig, n);
 }
 
 void
@@ -1030,38 +770,6 @@ tscrollup(Term *term, int orig, int n)
 		temp = term->line[i];
 		term->line[i] = term->line[i+n];
 		term->line[i+n] = temp;
-	}
-
-	selscroll(term, orig, -n);
-}
-
-void
-selscroll(Term *term, int orig, int n)
-{
-	if (sel.ob.x == -1)
-		return;
-
-	if (BETWEEN(sel.ob.y, orig, term->bot) || BETWEEN(sel.oe.y, orig, term->bot)) {
-		if ((sel.ob.y += n) > term->bot || (sel.oe.y += n) < term->top) {
-			selclear(term);
-			return;
-		}
-		if (sel.type == SEL_RECTANGULAR) {
-			if (sel.ob.y < term->top)
-				sel.ob.y = term->top;
-			if (sel.oe.y > term->bot)
-				sel.oe.y = term->bot;
-		} else {
-			if (sel.ob.y < term->top) {
-				sel.ob.y = term->top;
-				sel.ob.x = 0;
-			}
-			if (sel.oe.y > term->bot) {
-				sel.oe.y = term->bot;
-				sel.oe.x = term->col;
-			}
-		}
-		selnormalize(term);
 	}
 }
 
@@ -1188,8 +896,6 @@ tclearregion(Term *term, int x1, int y1, int x2, int y2)
 		term->dirty[y] = 1;
 		for (x = x1; x <= x2; x++) {
 			gp = &term->line[y][x];
-			if (selected(term, x, y))
-				selclear(term);
 			gp->fg = term->c.attr.fg;
 			gp->bg = term->c.attr.bg;
 			gp->mode = 0;
@@ -1579,7 +1285,8 @@ csihandle(Term *term)
 			tdumpline(term, term->c.y);
 			break;
 		case 2:
-			tdumpsel(term);
+			/* TODO - return event to dump selection */
+			/* tdumpsel(term); */
 			break;
 		case 4:
 			term->mode &= ~MODE_PRINT;
@@ -1817,8 +1524,8 @@ strhandle(Term *term)
 			if (narg > 2 && allowwindowops) {
 				dec = base64dec(strescseq.args[2]);
 				if (dec) {
-					xsetsel(dec);
-					xclipcopy();
+					/* TODO: return event for winop
+					xclipcopy(); */
 				} else {
 					fprintf(stderr, "erresc: invalid base64\n");
 				}
@@ -1944,23 +1651,6 @@ void
 printscreen(Term *term, const Arg *arg)
 {
 	tdump(term);
-}
-
-void
-printsel(Term *term, const Arg *arg)
-{
-	tdumpsel(term);
-}
-
-void
-tdumpsel(Term *term)
-{
-	char *ptr;
-
-	if ((ptr = getsel(term))) {
-		tprinter(term, ptr, strlen(ptr));
-		free(ptr);
-	}
 }
 
 void
@@ -2351,8 +2041,6 @@ check_control_code:
 		 */
 		return;
 	}
-	if (sel.ob.x != -1 && BETWEEN(term->c.y, sel.ob.y, sel.oe.y))
-		selclear(term);
 
 	gp = &term->line[term->c.y][term->c.x];
 	if (IS_SET(MODE_WRAP) && (term->c.state & CURSOR_WRAPNEXT)) {

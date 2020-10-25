@@ -173,15 +173,8 @@ static void resize(XEvent *);
 static void focus(XEvent *);
 static uint buttonmask(uint);
 static int mouseaction(XEvent *, uint);
-static void brelease(XEvent *);
-static void bpress(XEvent *);
-static void bmotion(XEvent *);
 static void propnotify(XEvent *);
 static void selnotify(XEvent *);
-static void selclear_(XEvent *);
-static void selrequest(XEvent *);
-static void setsel(char *, Time);
-static void mousesel(XEvent *, int);
 static void mousereport(XEvent *);
 static char *kmap(KeySym, uint);
 static int match(uint, uint);
@@ -198,21 +191,18 @@ static void (*handler[LASTEvent])(XEvent *) = {
 	[Expose] = expose,
 	[FocusIn] = focus,
 	[FocusOut] = focus,
-	[MotionNotify] = bmotion,
-	[ButtonPress] = bpress,
-	[ButtonRelease] = brelease,
 /*
  * Uncomment if you want the selection to disappear when you select something
  * different in another window.
  */
 /*	[SelectionClear] = selclear_, */
 	[SelectionNotify] = selnotify,
+
 /*
  * PropertyNotify is only turned on when there is some INCR transfer happening
  * for the selection retrieval.
  */
 	[PropertyNotify] = propnotify,
-	[SelectionRequest] = selrequest,
 };
 
 /* Globals */
@@ -346,23 +336,6 @@ evrow(XEvent *e)
 }
 
 void
-mousesel(XEvent *e, int done)
-{
-	int type, seltype = SEL_REGULAR;
-	uint state = e->xbutton.state & ~(Button1Mask | forcemousemod);
-
-	for (type = 1; type < LEN(selmasks); ++type) {
-		if (match(selmasks[type], state)) {
-			seltype = type;
-			break;
-		}
-	}
-	selextend(&term, evcol(e), evrow(e), seltype, done);
-	if (done)
-		setsel(getsel(&term), e->xbutton.time);
-}
-
-void
 mousereport(XEvent *e)
 {
 	int len, x = evcol(e), y = evrow(e),
@@ -436,59 +409,10 @@ buttonmask(uint button)
 	     : 0;
 }
 
-int
-mouseaction(XEvent *e, uint release)
-{
-	MouseShortcut *ms;
-
-	/* ignore Button<N>mask for Button<N> - it's set on release */
-	uint state = e->xbutton.state & ~buttonmask(e->xbutton.button);
-
-	for (ms = mshortcuts; ms < mshortcuts + LEN(mshortcuts); ms++) {
-		if (ms->release == release &&
-		    ms->button == e->xbutton.button &&
-		    (match(ms->mod, state) ||  /* exact or forced */
-		     match(ms->mod, state & ~forcemousemod))) {
-			ms->func(&(ms->arg));
-			return 1;
-		}
-	}
-
-	return 0;
-}
-
 void
-bpress(XEvent *e)
+xclipcopy(void)
 {
-	struct timespec now;
-	int snap;
-
-	if (IS_SET(MODE_MOUSE) && !(e->xbutton.state & forcemousemod)) {
-		mousereport(e);
-		return;
-	}
-
-	if (mouseaction(e, 0))
-		return;
-
-	if (e->xbutton.button == Button1) {
-		/*
-		 * If the user clicks below predefined timeouts specific
-		 * snapping behaviour is exposed.
-		 */
-		clock_gettime(CLOCK_MONOTONIC, &now);
-		if (TIMEDIFF(now, xsel.tclick2) <= tripleclicktimeout) {
-			snap = SNAP_LINE;
-		} else if (TIMEDIFF(now, xsel.tclick1) <= doubleclicktimeout) {
-			snap = SNAP_WORD;
-		} else {
-			snap = 0;
-		}
-		xsel.tclick2 = xsel.tclick1;
-		xsel.tclick1 = now;
-
-		selstart(&term, evcol(e), evrow(e), snap);
-	}
+	clipcopy(NULL);
 }
 
 void
@@ -503,6 +427,24 @@ propnotify(XEvent *e)
 			 xpev->atom == clipboard)) {
 		selnotify(e);
 	}
+}
+
+void
+setsel(char *str, Time t)
+{
+	if (!str)
+		return;
+
+	free(xsel.primary);
+	xsel.primary = str;
+
+	XSetSelectionOwner(xw.dpy, XA_PRIMARY, xw.win, t);
+}
+
+void
+xsetsel(char *str)
+{
+	setsel(str, CurrentTime);
 }
 
 void
@@ -590,121 +532,6 @@ selnotify(XEvent *e)
 	 * next data chunk in the property.
 	 */
 	XDeleteProperty(xw.dpy, xw.win, (int)property);
-}
-
-void
-xclipcopy(void)
-{
-	clipcopy(NULL);
-}
-
-void
-selclear_(XEvent *e)
-{
-	selclear(&term);
-}
-
-void
-selrequest(XEvent *e)
-{
-	XSelectionRequestEvent *xsre;
-	XSelectionEvent xev;
-	Atom xa_targets, string, clipboard;
-	char *seltext;
-
-	xsre = (XSelectionRequestEvent *) e;
-	xev.type = SelectionNotify;
-	xev.requestor = xsre->requestor;
-	xev.selection = xsre->selection;
-	xev.target = xsre->target;
-	xev.time = xsre->time;
-	if (xsre->property == None)
-		xsre->property = xsre->target;
-
-	/* reject */
-	xev.property = None;
-
-	xa_targets = XInternAtom(xw.dpy, "TARGETS", 0);
-	if (xsre->target == xa_targets) {
-		/* respond with the supported type */
-		string = xsel.xtarget;
-		XChangeProperty(xsre->display, xsre->requestor, xsre->property,
-				XA_ATOM, 32, PropModeReplace,
-				(uchar *) &string, 1);
-		xev.property = xsre->property;
-	} else if (xsre->target == xsel.xtarget || xsre->target == XA_STRING) {
-		/*
-		 * xith XA_STRING non ascii characters may be incorrect in the
-		 * requestor. It is not our problem, use utf8.
-		 */
-		clipboard = XInternAtom(xw.dpy, "CLIPBOARD", 0);
-		if (xsre->selection == XA_PRIMARY) {
-			seltext = xsel.primary;
-		} else if (xsre->selection == clipboard) {
-			seltext = xsel.clipboard;
-		} else {
-			fprintf(stderr,
-				"Unhandled clipboard selection 0x%lx\n",
-				xsre->selection);
-			return;
-		}
-		if (seltext != NULL) {
-			XChangeProperty(xsre->display, xsre->requestor,
-					xsre->property, xsre->target,
-					8, PropModeReplace,
-					(uchar *)seltext, strlen(seltext));
-			xev.property = xsre->property;
-		}
-	}
-
-	/* all done, send a notification to the listener */
-	if (!XSendEvent(xsre->display, xsre->requestor, 1, 0, (XEvent *) &xev))
-		fprintf(stderr, "Error sending SelectionNotify event\n");
-}
-
-void
-setsel(char *str, Time t)
-{
-	if (!str)
-		return;
-
-	free(xsel.primary);
-	xsel.primary = str;
-
-	XSetSelectionOwner(xw.dpy, XA_PRIMARY, xw.win, t);
-	if (XGetSelectionOwner(xw.dpy, XA_PRIMARY) != xw.win)
-		selclear(&term);
-}
-
-void
-xsetsel(char *str)
-{
-	setsel(str, CurrentTime);
-}
-
-void
-brelease(XEvent *e)
-{
-	if (IS_SET(MODE_MOUSE) && !(e->xbutton.state & forcemousemod)) {
-		mousereport(e);
-		return;
-	}
-
-	if (mouseaction(e, 1))
-		return;
-	if (e->xbutton.button == Button1)
-		mousesel(e, 1);
-}
-
-void
-bmotion(XEvent *e)
-{
-	if (IS_SET(MODE_MOUSE) && !(e->xbutton.state & forcemousemod)) {
-		mousereport(e);
-		return;
-	}
-
-	mousesel(e, 0);
 }
 
 void
@@ -1492,8 +1319,6 @@ xdrawcursor(int cx, int cy, Glyph g, int ox, int oy, Glyph og)
 	Color drawcol;
 
 	/* remove the old cursor */
-	if (selected(&term, ox, oy))
-		og.mode ^= ATTR_REVERSE;
 	xdrawglyph(og, ox, oy);
 
 	if (IS_SET(MODE_HIDE))
@@ -1507,21 +1332,11 @@ xdrawcursor(int cx, int cy, Glyph g, int ox, int oy, Glyph og)
 	if (IS_SET(MODE_REVERSE)) {
 		g.mode |= ATTR_REVERSE;
 		g.bg = defaultfg;
-		if (selected(&term, cx, cy)) {
-			drawcol = dc.col[defaultcs];
-			g.fg = defaultrcs;
-		} else {
-			drawcol = dc.col[defaultrcs];
-			g.fg = defaultcs;
-		}
+		drawcol = dc.col[defaultrcs];
+		g.fg = defaultcs;
 	} else {
-		if (selected(&term, cx, cy)) {
-			g.fg = defaultfg;
-			g.bg = defaultrcs;
-		} else {
-			g.fg = defaultbg;
-			g.bg = defaultcs;
-		}
+		g.fg = defaultbg;
+		g.bg = defaultcs;
 		drawcol = dc.col[g.bg];
 	}
 
@@ -1626,8 +1441,6 @@ xdrawline(Line line, int x1, int y1, int x2)
 		new = line[x];
 		if (new.mode == ATTR_WDUMMY)
 			continue;
-		if (selected(&term, x, y1))
-			new.mode ^= ATTR_REVERSE;
 		if (i > 0 && ATTRCMP(base, new)) {
 			xdrawglyphfontspecs(specs, base, i, ox, y1);
 			specs += i;
@@ -2054,7 +1867,6 @@ run:
 	tnew(&term, cols, rows);
 	xinit(cols, rows);
 	xsetenv();
-	selinit(&term);
 	run();
 
 	return 0;
