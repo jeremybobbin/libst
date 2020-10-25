@@ -1902,7 +1902,7 @@ run(void)
 		}
 	} while (ev.type != MapNotify);
 
-	ttyfd = ttynew(&term, opt_line, shell, opt_io, opt_cmd);
+	ttyfd = ttynew(&term, shell, opt_io, opt_cmd);
 	cresize(w, h);
 
 	for (timeout = -1, drawing = 0, lastblink = (struct timespec){0};;) {
@@ -2022,9 +2022,6 @@ main(int argc, char *argv[])
 		break;
 	case 'o':
 		opt_io = EARGF(usage());
-		break;
-	case 'l':
-		opt_line = EARGF(usage());
 		break;
 	case 'n':
 		opt_name = EARGF(usage());

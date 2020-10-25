@@ -125,7 +125,6 @@ typedef struct {
 } STREscape;
 
 static void execsh(char *, char **);
-static void stty(char **);
 static void sigchld(int);
 static void ttywriteraw(Term *term, const char *, size_t);
 
@@ -703,32 +702,8 @@ sigchld(int a)
 	_exit(0);
 }
 
-void
-stty(char **args)
-{
-	char cmd[_POSIX_ARG_MAX], **p, *q, *s;
-	size_t n, siz;
-
-	if ((n = strlen(stty_args)) > sizeof(cmd)-1)
-		die("incorrect stty parameters\n");
-	memcpy(cmd, stty_args, n);
-	q = cmd + n;
-	siz = sizeof(cmd) - n;
-	for (p = args; p && (s = *p); ++p) {
-		if ((n = strlen(s)) > siz-1)
-			die("stty parameter length too long\n");
-		*q++ = ' ';
-		memcpy(q, s, n);
-		q += n;
-		siz -= n + 1;
-	}
-	*q = '\0';
-	if (system(cmd) != 0)
-		perror("Couldn't call stty");
-}
-
 int
-ttynew(Term *term, char *line, char *cmd, char *out, char **args)
+ttynew(Term *term, char *cmd, char *out, char **args)
 {
 	int m, s;
 
@@ -740,15 +715,6 @@ ttynew(Term *term, char *line, char *cmd, char *out, char **args)
 			fprintf(stderr, "Error opening %s:%s\n",
 				out, strerror(errno));
 		}
-	}
-
-	if (line) {
-		if ((cmdfd = open(line, O_RDWR)) < 0)
-			die("open line '%s' failed: %s\n",
-			    line, strerror(errno));
-		dup2(cmdfd, 0);
-		stty(args);
-		return cmdfd;
 	}
 
 	/* seems to work fine on linux, openbsd and freebsd */

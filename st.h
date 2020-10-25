@@ -119,7 +119,7 @@ void tnew(Term *, int, int);
 void tresize(Term *, int, int);
 void tsetdirtattr(Term *, int);
 void ttyhangup(Term *);
-int ttynew(Term *, char *, char *, char *, char **);
+int ttynew(Term *, char *, char *, char **);
 size_t ttyread(Term *);
 void ttyresize(Term *, int, int);
 void ttywrite(Term *, const char *, size_t, int);
