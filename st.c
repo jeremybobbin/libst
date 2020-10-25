@@ -168,8 +168,6 @@ static ssize_t xwrite(int, const char *, size_t);
 /* Globals */
 static CSIEscape csiescseq;
 static STREscape strescseq;
-static int iofd = 1;
-static int cmdfd;
 static pid_t pid;
 
 static uchar utfbyte[UTF_SIZ + 1] = {0x80,    0, 0xC0, 0xE0, 0xF0};
@@ -450,9 +448,9 @@ ttynew(Term *term, char *cmd, char *out, char **args)
 
 	if (out) {
 		term->mode |= MODE_PRINT;
-		iofd = (!strcmp(out, "-")) ?
+		term->iofd = (!strcmp(out, "-")) ?
 			  1 : open(out, O_WRONLY | O_CREAT, 0666);
-		if (iofd < 0) {
+		if (term->iofd < 0) {
 			fprintf(stderr, "Error opening %s:%s\n",
 				out, strerror(errno));
 		}
@@ -467,7 +465,7 @@ ttynew(Term *term, char *cmd, char *out, char **args)
 		die("fork failed: %s\n", strerror(errno));
 		break;
 	case 0:
-		close(iofd);
+		close(term->iofd);
 		setsid(); /* create a new process group */
 		dup2(s, 0);
 		dup2(s, 1);
@@ -488,11 +486,11 @@ ttynew(Term *term, char *cmd, char *out, char **args)
 			die("pledge\n");
 #endif
 		close(s);
-		cmdfd = m;
+		term->cmdfd = m;
 		signal(SIGCHLD, sigchld);
 		break;
 	}
-	return cmdfd;
+	return term->cmdfd;
 }
 
 size_t
@@ -503,7 +501,7 @@ ttyread(Term *term)
 	int ret, written;
 
 	/* append read bytes to unprocessed bytes */
-	ret = read(cmdfd, buf+buflen, LEN(buf)-buflen);
+	ret = read(term->cmdfd, buf+buflen, LEN(buf)-buflen);
 
 	switch (ret) {
 	case 0:
@@ -566,22 +564,22 @@ ttywriteraw(Term *term, const char *s, size_t n)
 	while (n > 0) {
 		FD_ZERO(&wfd);
 		FD_ZERO(&rfd);
-		FD_SET(cmdfd, &wfd);
-		FD_SET(cmdfd, &rfd);
+		FD_SET(term->cmdfd, &wfd);
+		FD_SET(term->cmdfd, &rfd);
 
 		/* Check if we can write. */
-		if (pselect(cmdfd+1, &rfd, &wfd, NULL, NULL, NULL) < 0) {
+		if (pselect(term->cmdfd+1, &rfd, &wfd, NULL, NULL, NULL) < 0) {
 			if (errno == EINTR)
 				continue;
 			die("select failed: %s\n", strerror(errno));
 		}
-		if (FD_ISSET(cmdfd, &wfd)) {
+		if (FD_ISSET(term->cmdfd, &wfd)) {
 			/*
 			 * Only write the bytes written by ttywrite() or the
 			 * default of 256. This seems to be a reasonable value
 			 * for a serial line. Bigger values might clog the I/O.
 			 */
-			if ((r = write(cmdfd, s, (n < lim)? n : lim)) < 0)
+			if ((r = write(term->cmdfd, s, (n < lim)? n : lim)) < 0)
 				goto write_error;
 			if (r < n) {
 				/*
@@ -598,7 +596,7 @@ ttywriteraw(Term *term, const char *s, size_t n)
 				break;
 			}
 		}
-		if (FD_ISSET(cmdfd, &rfd))
+		if (FD_ISSET(term->cmdfd, &rfd))
 			lim = ttyread(term);
 	}
 	return;
@@ -616,7 +614,7 @@ ttyresize(Term *term, int tw, int th)
 	w.ws_col = term->col;
 	w.ws_xpixel = tw;
 	w.ws_ypixel = th;
-	if (ioctl(cmdfd, TIOCSWINSZ, &w) < 0)
+	if (ioctl(term->cmdfd, TIOCSWINSZ, &w) < 0)
 		fprintf(stderr, "Couldn't set window size: %s\n", strerror(errno));
 }
 
@@ -1627,17 +1625,17 @@ strreset(void)
 void
 tsendbreak(Term *term)
 {
-	if (tcsendbreak(cmdfd, 0))
+	if (tcsendbreak(term->cmdfd, 0))
 		perror("Error sending break");
 }
 
 void
 tprinter(Term *term, char *s, size_t len)
 {
-	if (iofd != -1 && xwrite(iofd, s, len) < 0) {
+	if (term->iofd != -1 && xwrite(term->iofd, s, len) < 0) {
 		perror("Error writing to output file");
-		close(iofd);
-		iofd = -1;
+		close(term->iofd);
+		term->iofd = -1;
 	}
 }
 

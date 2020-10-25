@@ -86,6 +86,8 @@ typedef struct {
 
 /* Internal representation of the screen */
 typedef struct {
+	int cmdfd;    /* tty fd */ 
+	int iofd;     /* copied fd */ 
 	int row;      /* nb row */
 	int col;      /* nb col */
 	Line *line;   /* screen */
