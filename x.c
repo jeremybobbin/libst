@@ -54,7 +54,10 @@ typedef struct {
 static void clipcopy(const Arg *);
 static void clippaste(const Arg *);
 static void numlock(const Arg *);
+static void printscreen(const Arg *arg);
 static void selpaste(const Arg *);
+static void sendbreak(const Arg *);
+static void toggleprinter(const Arg *arg);
 static void zoom(const Arg *);
 static void zoomabs(const Arg *);
 static void zoomreset(const Arg *);
@@ -278,10 +281,29 @@ selpaste(const Arg *dummy)
 }
 
 void
+sendbreak(const Arg *dummy)
+{
+	tsendbreak(&term);
+}
+
+void
+toggleprinter(const Arg *dummy)
+{
+	ttoggleprinter(&term);
+}
+
+void
 numlock(const Arg *dummy)
 {
 	win.mode ^= MODE_NUMLOCK;
 }
+
+void
+printscreen(const Arg *dummy)
+{
+	tprintscreen(&term);
+}
+
 
 void
 zoom(const Arg *arg)

@@ -109,10 +109,9 @@ void die(const char *, ...);
 void tredraw(Term *);
 void tdraw(Term *);
 
-void printscreen(Term *, const Arg *);
-void printsel(Term *, const Arg *);
-void sendbreak(const Arg *);
-void toggleprinter(Term *, const Arg *);
+void tprintscreen(Term *);
+void tsendbreak(Term *);
+void ttoggleprinter(Term *);
 
 int tattrset(Term *, int);
 void tnew(Term *, int, int);

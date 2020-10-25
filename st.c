@@ -1625,7 +1625,7 @@ strreset(void)
 }
 
 void
-sendbreak(const Arg *arg)
+tsendbreak(Term *term)
 {
 	if (tcsendbreak(cmdfd, 0))
 		perror("Error sending break");
@@ -1642,13 +1642,13 @@ tprinter(Term *term, char *s, size_t len)
 }
 
 void
-toggleprinter(Term *term, const Arg *arg)
+ttoggleprinter(Term *term)
 {
 	term->mode ^= MODE_PRINT;
 }
 
 void
-printscreen(Term *term, const Arg *arg)
+tprintscreen(Term *term)
 {
 	tdump(term);
 }
