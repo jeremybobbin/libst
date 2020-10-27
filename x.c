@@ -1066,7 +1066,7 @@ xinit(int cols, int rows)
 			PropModeReplace, (uchar *)&thispid, 1);
 
 	win.mode = MODE_NUMLOCK;
-	resettitle();
+	resettitle(&term);
 	xhints();
 	XMapWindow(xw.dpy, xw.win);
 	XSync(xw.dpy, False);
@@ -1654,6 +1654,32 @@ kmap(KeySym k, uint state)
 	return NULL;
 }
 
+int
+thandler(Term *term, Event e, Arg arg) {
+	switch (e) {
+	case ST_BELL:
+		xbell();
+		break;
+	case ST_TITLE:
+		xsettitle(arg.s);
+		break;
+	case ST_ICONTITLE:
+		xseticontitle(arg.s);
+		break;
+	case ST_RESET:
+		xsettitle(NULL);
+		xloadcols();
+		break;
+	case ST_SET:
+		xsetmode(1, arg.ui);
+		break;
+	case ST_UNSET:
+		xsetmode(0, arg.ui);
+		break;
+	}
+	return 0;
+}
+
 void
 kpress(XEvent *ev)
 {
@@ -1910,6 +1936,7 @@ run:
 	cols = MAX(cols, 1);
 	rows = MAX(rows, 1);
 	tnew(&term, cols, rows);
+	term.handler = thandler;
 	xinit(cols, rows);
 	xsetenv();
 	run();

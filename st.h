@@ -73,9 +73,21 @@ typedef union {
 	int i;
 	uint ui;
 	float f;
-	const void *v;
-	const char *s;
+	void *v;
+	char *s;
 } Arg;
+
+typedef enum {
+	ST_TITLE,       /* char * - xsettitle */
+	ST_SET,
+	ST_UNSET,
+	ST_ICONTITLE,  /* char * - xseticontitle */
+	ST_CSI_ERROR,   /* char * - parse error with CSI string */
+	ST_STR_ERROR,   /* char * - parse error with CSI string */
+	ST_BELL,        /* unintialized - ascii bell, maybe xbell */
+	ST_RESET,       /* uninitialized - reset to initial state */
+	ST_EOF          /* uninitialized - EOF on TTY */
+} Event;
 
 typedef struct {
 	Glyph attr; /* current char attributes */
@@ -125,7 +137,8 @@ typedef struct {
 } STREscape;
 
 /* Internal representation of the screen */
-typedef struct {
+typedef struct Term Term;
+struct Term {
 	pid_t pid;
 	int cmdfd;    /* tty fd */ 
 	int iofd;     /* copied fd */ 
@@ -145,10 +158,11 @@ typedef struct {
 	int charset;  /* current charset */
 	int icharset; /* selected charset for sequence */
 	int *tabs;
+	int (*handler)(Term *, Event, Arg);
 	Rune lastc;   /* last printed char outside of sequence, 0 if control */
 	CSIEscape csiescseq;
 	STREscape strescseq;
-} Term;
+};
 
 void die(const char *, ...);
 void tredraw(Term *);
@@ -168,7 +182,7 @@ size_t ttyread(Term *);
 void ttyresize(Term *, int, int);
 void ttywrite(Term *, const char *, size_t, int);
 
-void resettitle(void);
+void resettitle(Term *);
 
 void selclear(Term *);
 void selinit(Term *);

@@ -1060,10 +1060,10 @@ tsetmode(Term *term, int priv, int set, int *args, int narg)
 		if (priv) {
 			switch (*args) {
 			case 1: /* DECCKM -- Cursor key */
-				xsetmode(set, MODE_APPCURSOR);
+				term->handler(term, set ? ST_SET : ST_UNSET, (Arg){.ui = MODE_APPCURSOR});
 				break;
 			case 5: /* DECSCNM -- Reverse video */
-				xsetmode(set, MODE_REVERSE);
+				term->handler(term, set ? ST_SET : ST_UNSET, (Arg){.ui = MODE_REVERSE});
 				break;
 			case 6: /* DECOM -- Origin */
 				MODBIT(term->c.state, set, CURSOR_ORIGIN);
@@ -1083,36 +1083,36 @@ tsetmode(Term *term, int priv, int set, int *args, int narg)
 			case 12: /* att610 -- Start blinking cursor (IGNORED) */
 				break;
 			case 25: /* DECTCEM -- Text Cursor Enable Mode */
-				xsetmode(!set, MODE_HIDE);
+				term->handler(term, !set ? ST_SET : ST_UNSET, (Arg){.ui = MODE_HIDE});
 				break;
 			case 9:    /* X10 mouse compatibility mode */
 				xsetpointermotion(0);
-				xsetmode(0, MODE_MOUSE);
-				xsetmode(set, MODE_MOUSEX10);
+				term->handler(term, ST_UNSET, (Arg){.ui = MODE_MOUSE});
+				term->handler(term, set ? ST_SET : ST_UNSET, (Arg){.ui = MODE_MOUSEX10});
 				break;
 			case 1000: /* 1000: report button press */
 				xsetpointermotion(0);
-				xsetmode(0, MODE_MOUSE);
-				xsetmode(set, MODE_MOUSEBTN);
+				term->handler(term, ST_UNSET, (Arg){.ui = MODE_MOUSE});
+				term->handler(term, set ? ST_SET : ST_UNSET, (Arg){.ui = MODE_MOUSEBTN});
 				break;
 			case 1002: /* 1002: report motion on button press */
 				xsetpointermotion(0);
-				xsetmode(0, MODE_MOUSE);
-				xsetmode(set, MODE_MOUSEMOTION);
+				term->handler(term, ST_UNSET, (Arg){.ui = MODE_MOUSE});
+				term->handler(term, set ? ST_SET : ST_UNSET, (Arg){.ui = MODE_MOUSEMOTION});
 				break;
 			case 1003: /* 1003: enable all mouse motions */
 				xsetpointermotion(set);
-				xsetmode(0, MODE_MOUSE);
-				xsetmode(set, MODE_MOUSEMANY);
+				term->handler(term, ST_UNSET, (Arg){.ui = MODE_MOUSE});
+				term->handler(term, set ? ST_SET : ST_UNSET, (Arg){.ui = MODE_MOUSEMANY});
 				break;
 			case 1004: /* 1004: send focus events to tty */
-				xsetmode(set, MODE_FOCUS);
+				term->handler(term, set ? ST_SET : ST_UNSET, (Arg){.ui = MODE_FOCUS});
 				break;
 			case 1006: /* 1006: extended reporting mode */
-				xsetmode(set, MODE_MOUSESGR);
+				term->handler(term, set ? ST_SET : ST_UNSET, (Arg){.ui = MODE_MOUSESGR});
 				break;
 			case 1034:
-				xsetmode(set, MODE_8BIT);
+				term->handler(term, set ? ST_SET : ST_UNSET, (Arg){.ui = MODE_8BIT});
 				break;
 			case 1049: /* swap screen & set/restore cursor as xterm */
 				if (!allowaltscreen)
@@ -1137,7 +1137,7 @@ tsetmode(Term *term, int priv, int set, int *args, int narg)
 				tcursor(term, (set) ? CURSOR_SAVE : CURSOR_LOAD);
 				break;
 			case 2004: /* 2004: bracketed paste mode */
-				xsetmode(set, MODE_BRCKTPASTE);
+				term->handler(term, set ? ST_SET : ST_UNSET, (Arg){.ui = MODE_BRCKTPASTE});
 				break;
 			/* Not implemented mouse modes. See comments there. */
 			case 1001: /* mouse highlight mode; can hang the
@@ -1160,7 +1160,7 @@ tsetmode(Term *term, int priv, int set, int *args, int narg)
 			case 0:  /* Error (IGNORED) */
 				break;
 			case 2:
-				xsetmode(set, MODE_KBDLOCK);
+				term->handler(term, set ? ST_SET : ST_UNSET, (Arg){.ui = MODE_KBDLOCK});
 				break;
 			case 4:  /* IRM -- Insertion-replacement */
 				MODBIT(term->mode, set, MODE_INSERT);
@@ -1439,17 +1439,17 @@ strhandle(Term *term)
 		switch (par) {
 		case 0:
 			if (narg > 1) {
-				xsettitle(term->strescseq.args[1]);
-				xseticontitle(term->strescseq.args[1]);
+				term->handler(term, ST_BELL, (Arg){.s = term->strescseq.args[1]});
+				term->handler(term, ST_ICONTITLE, (Arg){.s = term->strescseq.args[1]});
 			}
 			return;
 		case 1:
 			if (narg > 1)
-				xseticontitle(term->strescseq.args[1]);
+				term->handler(term, ST_ICONTITLE, (Arg){.s = term->strescseq.args[1]});
 			return;
 		case 2:
 			if (narg > 1)
-				xsettitle(term->strescseq.args[1]);
+				term->handler(term, ST_BELL, (Arg){.s = term->strescseq.args[1]});
 			return;
 		case 52:
 			if (narg > 2 && allowwindowops) {
@@ -1485,7 +1485,7 @@ strhandle(Term *term)
 		}
 		break;
 	case 'k': /* old title set compatibility */
-		xsettitle(term->strescseq.args[0]);
+		term->handler(term, ST_BELL, (Arg){.s = term->strescseq.args[0]});
 		return;
 	case 'P': /* DCS -- Device Control String */
 	case '_': /* APC -- Application Program Command */
@@ -1708,7 +1708,7 @@ tcontrolcode(Term *term, uchar ascii)
 			/* backwards compatibility to xterm */
 			strhandle(term);
 		} else {
-			xbell();
+			term->handler(term, ST_BELL, (Arg){0});
 		}
 		break;
 	case '\033': /* ESC */
@@ -1840,14 +1840,13 @@ eschandle(Term *term, uchar ascii)
 		break;
 	case 'c': /* RIS -- Reset to initial state */
 		treset(term);
-		resettitle();
-		xloadcols();
+		term->handler(term, ST_RESET, (Arg){0});
 		break;
 	case '=': /* DECPAM -- Application keypad */
-		xsetmode(1, MODE_APPKEYPAD);
+		term->handler(term, ST_SET, (Arg){.ui = MODE_APPKEYPAD});
 		break;
 	case '>': /* DECPNM -- Normal keypad */
-		xsetmode(0, MODE_APPKEYPAD);
+		term->handler(term, ST_SET, (Arg){.ui = MODE_APPKEYPAD});
 		break;
 	case '7': /* DECSC -- Save Cursor */
 		tcursor(term, CURSOR_SAVE);
@@ -2119,9 +2118,9 @@ tresize(Term *term, int col, int row)
 }
 
 void
-resettitle(void)
+resettitle(Term *term)
 {
-	xsettitle(NULL);
+	term->handler(term, ST_TITLE, (Arg){0});
 }
 
 void
