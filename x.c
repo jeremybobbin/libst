@@ -5,6 +5,7 @@
 #include <locale.h>
 #include <signal.h>
 #include <sys/select.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 #include <libgen.h>
@@ -143,6 +144,8 @@ typedef struct {
 	GC gc;
 } DC;
 
+static void sigchld(int);
+
 static inline ushort sixd_to_16bit(int);
 static int xmakeglyphfontspecs(XftGlyphFontSpec *, const Glyph *, int, int, int);
 static void xdrawglyphfontspecs(const XftGlyphFontSpec *, Glyph, int, int, int);
@@ -261,6 +264,25 @@ clipcopy(const Arg *dummy)
 		clipboard = XInternAtom(xw.dpy, "CLIPBOARD", 0);
 		XSetSelectionOwner(xw.dpy, clipboard, xw.win, CurrentTime);
 	}
+}
+
+void
+sigchld(int a)
+{
+	int stat;
+	pid_t p;
+
+	if ((p = waitpid(term.pid, &stat, WNOHANG)) < 0)
+		die("waiting for pid %hd failed: %s\n", term.pid, strerror(errno));
+
+	if (term.pid != p)
+		return;
+
+	if (WIFEXITED(stat) && WEXITSTATUS(stat))
+		die("child exited with status %d\n", WEXITSTATUS(stat));
+	else if (WIFSIGNALED(stat))
+		die("child terminated due to signal %d\n", WTERMSIG(stat));
+	_exit(0);
 }
 
 void
@@ -1738,6 +1760,7 @@ run(void)
 	} while (ev.type != MapNotify);
 
 	ttyfd = ttynew(&term, shell, opt_io, opt_cmd);
+	signal(SIGCHLD, sigchld);
 	cresize(w, h);
 
 	for (timeout = -1, drawing = 0, lastblink = (struct timespec){0};;) {

@@ -8,7 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <signal.h>
 #include <sys/ioctl.h>
 #include <sys/select.h>
 #include <sys/types.h>
@@ -67,7 +66,6 @@ enum charset {
 };
 
 static void execsh(char *, char **);
-static void sigchld(int);
 static void ttywriteraw(Term *term, const char *, size_t);
 
 static void csidump(Term *);
@@ -124,9 +122,6 @@ static char *base64dec(const char *);
 static char base64dec_getc(const char **);
 
 static ssize_t xwrite(int, const char *, size_t);
-
-/* Globals */
-static pid_t pid;
 
 static uchar utfbyte[UTF_SIZ + 1] = {0x80,    0, 0xC0, 0xE0, 0xF0};
 static uchar utfmask[UTF_SIZ + 1] = {0xC0, 0x80, 0xE0, 0xF0, 0xF8};
@@ -380,25 +375,6 @@ execsh(char *cmd, char **args)
 	_exit(1);
 }
 
-void
-sigchld(int a)
-{
-	int stat;
-	pid_t p;
-
-	if ((p = waitpid(pid, &stat, WNOHANG)) < 0)
-		die("waiting for pid %hd failed: %s\n", pid, strerror(errno));
-
-	if (pid != p)
-		return;
-
-	if (WIFEXITED(stat) && WEXITSTATUS(stat))
-		die("child exited with status %d\n", WEXITSTATUS(stat));
-	else if (WIFSIGNALED(stat))
-		die("child terminated due to signal %d\n", WTERMSIG(stat));
-	_exit(0);
-}
-
 int
 ttynew(Term *term, char *cmd, char *out, char **args)
 {
@@ -418,7 +394,7 @@ ttynew(Term *term, char *cmd, char *out, char **args)
 	if (openpty(&m, &s, NULL, NULL, NULL) < 0)
 		die("openpty failed: %s\n", strerror(errno));
 
-	switch (pid = fork()) {
+	switch (term->pid = fork()) {
 	case -1:
 		die("fork failed: %s\n", strerror(errno));
 		break;
@@ -445,7 +421,6 @@ ttynew(Term *term, char *cmd, char *out, char **args)
 #endif
 		close(s);
 		term->cmdfd = m;
-		signal(SIGCHLD, sigchld);
 		break;
 	}
 	return term->cmdfd;
@@ -580,7 +555,7 @@ void
 ttyhangup(Term *term)
 {
 	/* Send SIGHUP to shell */
-	kill(pid, SIGHUP);
+	kill(term->pid, SIGHUP);
 }
 
 int

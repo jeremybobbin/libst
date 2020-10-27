@@ -126,6 +126,7 @@ typedef struct {
 
 /* Internal representation of the screen */
 typedef struct {
+	pid_t pid;
 	int cmdfd;    /* tty fd */ 
 	int iofd;     /* copied fd */ 
 	int row;      /* nb row */
