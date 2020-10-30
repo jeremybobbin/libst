@@ -1751,6 +1751,46 @@ cmessage(XEvent *e)
 }
 
 void
+drawregion(int x1, int y1, int x2, int y2)
+{
+	int y;
+
+	for (y = y1; y < y2; y++) {
+		if (!term.dirty[y])
+			continue;
+
+		term.dirty[y] = 0;
+		xdrawline(term.line[y], x1, y, x2);
+	}
+}
+
+void
+tdraw(void)
+{
+	int cx = term.c.x, ocx = term.ocx, ocy = term.ocy;
+
+	if (!xstartdraw())
+		return;
+
+	/* adjust cursor position */
+	LIMIT(term.ocx, 0, term.col-1);
+	LIMIT(term.ocy, 0, term.row-1);
+	if (term.line[term.ocy][term.ocx].mode & ATTR_WDUMMY)
+		term.ocx--;
+	if (term.line[term.c.y][cx].mode & ATTR_WDUMMY)
+		cx--;
+
+	drawregion(0, 0, term.col, term.row);
+	xdrawcursor(cx, term.c.y, term.line[term.c.y][cx],
+			term.ocx, term.ocy, term.line[term.ocy][term.ocx]);
+	term.ocx = cx;
+	term.ocy = term.c.y;
+	xfinishdraw();
+	if (ocx != term.ocx || ocy != term.ocy)
+		xximspot(term.ocx, term.ocy);
+}
+
+void
 resize(XEvent *e)
 {
 	if (e->xconfigure.width == win.w && e->xconfigure.height == win.h)
@@ -1857,7 +1897,7 @@ run(void)
 			}
 		}
 
-		tdraw(&term);
+		tdraw();
 		XFlush(xw.dpy);
 		drawing = 0;
 	}

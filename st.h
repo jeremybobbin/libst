@@ -165,8 +165,6 @@ struct Term {
 };
 
 void die(const char *, ...);
-void tredraw(Term *);
-void tdraw(Term *);
 
 void tprintscreen(Term *);
 void tsendbreak(Term *);
