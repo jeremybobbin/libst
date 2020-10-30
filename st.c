@@ -297,15 +297,21 @@ base64dec(const char *src)
 	return result;
 }
 
+Line *
+tgetline(Term *term, int n)
+{
+	return &term->line[n];
+}
+
 int
 tlinelen(Term *term, int y)
 {
 	int i = term->col;
 
-	if (term->line[y][i - 1].mode & ATTR_WRAP)
+	if ((*tgetline(term, y))[i - 1].mode & ATTR_WRAP)
 		return i;
 
-	while (i > 0 && term->line[y][i - 1].u == ' ')
+	while (i > 0 && (*tgetline(term, y))[i - 1].u == ' ')
 		--i;
 
 	return i;
@@ -564,7 +570,7 @@ tattrset(Term *term, int attr)
 
 	for (i = 0; i < term->row-1; i++) {
 		for (j = 0; j < term->col-1; j++) {
-			if (term->line[i][j].mode & attr)
+			if ((*tgetline(term, i))[j].mode & attr)
 				return 1;
 		}
 	}
@@ -591,7 +597,7 @@ tsetdirtattr(Term *term, int attr)
 
 	for (i = 0; i < term->row-1; i++) {
 		for (j = 0; j < term->col-1; j++) {
-			if (term->line[i][j].mode & attr) {
+			if ((*tgetline(term, i))[j].mode & attr) {
 				tsetdirt(term, i, i);
 				break;
 			}
@@ -678,9 +684,9 @@ tscrolldown(Term *term, int orig, int n)
 	tclearregion(term, 0, term->bot-n+1, term->col-1, term->bot);
 
 	for (i = term->bot; i >= orig+n; i--) {
-		temp = term->line[i];
-		term->line[i] = term->line[i-n];
-		term->line[i-n] = temp;
+		temp = *tgetline(term, i);
+		*tgetline(term, i) = (*tgetline(term, i-n));
+		(*tgetline(term, i-n)) = temp;
 	}
 
 }
@@ -697,9 +703,9 @@ tscrollup(Term *term, int orig, int n)
 	tsetdirt(term, orig+n, term->bot);
 
 	for (i = orig; i <= term->bot-n; i++) {
-		temp = term->line[i];
-		term->line[i] = term->line[i+n];
-		term->line[i+n] = temp;
+		temp = *tgetline(term, i);
+		*tgetline(term, i) = (*tgetline(term, i+n));
+		(*tgetline(term, i+n)) = temp;
 	}
 }
 
@@ -791,19 +797,19 @@ tsetchar(Term *term, Rune u, Glyph *attr, int x, int y)
 	   BETWEEN(u, 0x41, 0x7e) && vt100_0[u - 0x41])
 		utf8decode(vt100_0[u - 0x41], &u, UTF_SIZ);
 
-	if (term->line[y][x].mode & ATTR_WIDE) {
+	if ((*tgetline(term, y))[x].mode & ATTR_WIDE) {
 		if (x+1 < term->col) {
-			term->line[y][x+1].u = ' ';
-			term->line[y][x+1].mode &= ~ATTR_WDUMMY;
+			(*tgetline(term, y))[x+1].u = ' ';
+			(*tgetline(term, y))[x+1].mode &= ~ATTR_WDUMMY;
 		}
-	} else if (term->line[y][x].mode & ATTR_WDUMMY) {
-		term->line[y][x-1].u = ' ';
-		term->line[y][x-1].mode &= ~ATTR_WIDE;
+	} else if ((*tgetline(term, y))[x].mode & ATTR_WDUMMY) {
+		(*tgetline(term, y))[x-1].u = ' ';
+		(*tgetline(term, y))[x-1].mode &= ~ATTR_WIDE;
 	}
 
 	term->dirty[y] = 1;
-	term->line[y][x] = *attr;
-	term->line[y][x].u = u;
+	(*tgetline(term, y))[x] = *attr;
+	(*tgetline(term, y))[x].u = u;
 }
 
 void
@@ -825,7 +831,7 @@ tclearregion(Term *term, int x1, int y1, int x2, int y2)
 	for (y = y1; y <= y2; y++) {
 		term->dirty[y] = 1;
 		for (x = x1; x <= x2; x++) {
-			gp = &term->line[y][x];
+			gp = *tgetline(term, y) + x;
 			gp->fg = term->c.attr.fg;
 			gp->bg = term->c.attr.bg;
 			gp->mode = 0;
@@ -845,7 +851,7 @@ tdeletechar(Term *term, int n)
 	dst = term->c.x;
 	src = term->c.x + n;
 	size = term->col - src;
-	line = term->line[term->c.y];
+	line = (*tgetline(term, term->c.y));
 
 	memmove(&line[dst], &line[src], size * sizeof(Glyph));
 	tclearregion(term, term->col-n, term->c.y, term->col-1, term->c.y);
@@ -862,7 +868,7 @@ tinsertblank(Term *term, int n)
 	dst = term->c.x + n;
 	src = term->c.x;
 	size = term->col - dst;
-	line = term->line[term->c.y];
+	line = (*tgetline(term, term->c.y));
 
 	memmove(&line[dst], &line[src], size * sizeof(Glyph));
 	tclearregion(term, src, term->c.y, dst - 1, term->c.y);
@@ -1589,7 +1595,7 @@ tdumpline(Term *term, int n)
 	char buf[UTF_SIZ];
 	Glyph *bp, *end;
 
-	bp = &term->line[n][0];
+	bp = tgetline(term, n)[0];
 	end = &bp[MIN(tlinelen(term, n), term->col) - 1];
 	if (bp != end || bp->u != ' ') {
 		for ( ;bp <= end; ++bp)
@@ -1971,11 +1977,11 @@ check_control_code:
 		return;
 	}
 
-	gp = &term->line[term->c.y][term->c.x];
+	gp = &(*tgetline(term, term->c.y))[term->c.x];
 	if (IS_SET(MODE_WRAP) && (term->c.state & CURSOR_WRAPNEXT)) {
 		gp->mode |= ATTR_WRAP;
 		tnewline(term, 1);
-		gp = &term->line[term->c.y][term->c.x];
+		gp = &(*tgetline(term, term->c.y))[term->c.x];
 	}
 
 	if (IS_SET(MODE_INSERT) && term->c.x+width < term->col)
@@ -1983,7 +1989,7 @@ check_control_code:
 
 	if (term->c.x+width > term->col) {
 		tnewline(term, 1);
-		gp = &term->line[term->c.y][term->c.x];
+		gp = &(*tgetline(term, term->c.y))[term->c.x];
 	}
 
 	tsetchar(term, u, &term->c.attr, term->c.x, term->c.y);
@@ -2055,7 +2061,7 @@ tresize(Term *term, int col, int row)
 	 * memmove because we're freeing the earlier lines
 	 */
 	for (i = 0; i <= term->c.y - row; i++) {
-		free(term->line[i]);
+		free(*tgetline(term, i));
 		free(term->alt[i]);
 	}
 	/* ensure that both src and dst are not NULL */
@@ -2064,7 +2070,7 @@ tresize(Term *term, int col, int row)
 		memmove(term->alt, term->alt + i, row * sizeof(Line));
 	}
 	for (i += row; i < term->row; i++) {
-		free(term->line[i]);
+		free(*tgetline(term, i));
 		free(term->alt[i]);
 	}
 
@@ -2076,13 +2082,13 @@ tresize(Term *term, int col, int row)
 
 	/* resize each row to new width, zero-pad if needed */
 	for (i = 0; i < minrow; i++) {
-		term->line[i] = xrealloc(term->line[i], col * sizeof(Glyph));
+		*tgetline(term, i) = xrealloc(*tgetline(term, i), col * sizeof(Glyph));
 		term->alt[i]  = xrealloc(term->alt[i],  col * sizeof(Glyph));
 	}
 
 	/* allocate any new rows */
 	for (/* i = minrow */; i < row; i++) {
-		term->line[i] = xmalloc(col * sizeof(Glyph));
+		*tgetline(term, i) = xmalloc(col * sizeof(Glyph));
 		term->alt[i] = xmalloc(col * sizeof(Glyph));
 	}
 	if (col > term->col) {

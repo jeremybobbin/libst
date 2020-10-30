@@ -170,6 +170,7 @@ void tprintscreen(Term *);
 void tsendbreak(Term *);
 void ttoggleprinter(Term *);
 
+Line *tgetline(Term *, int); /* gets the line % rows */
 int tattrset(Term *, int);
 void tnew(Term *, int, int);
 void tresize(Term *, int, int);
