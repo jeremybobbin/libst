@@ -84,6 +84,46 @@ typedef struct {
 	char state;
 } TCursor;
 
+/* Arbitrary sizes */
+#define UTF_INVALID   0xFFFD
+#define UTF_SIZ       4
+#define ESC_BUF_SIZ   (128*UTF_SIZ)
+#define ESC_ARG_SIZ   16
+#define STR_BUF_SIZ   ESC_BUF_SIZ
+#define STR_ARG_SIZ   ESC_ARG_SIZ
+
+enum escape_state {
+	ESC_START      = 1,
+	ESC_CSI        = 2,
+	ESC_STR        = 4,  /* DCS, OSC, PM, APC */
+	ESC_ALTCHARSET = 8,
+	ESC_STR_END    = 16, /* a final string was encountered */
+	ESC_TEST       = 32, /* Enter in test mode */
+	ESC_UTF8       = 64,
+};
+
+/* CSI Escape sequence structs */
+/* ESC '[' [[ [<priv>] <arg> [;]] <mode> [<mode>]] */
+typedef struct {
+	char buf[ESC_BUF_SIZ]; /* raw string */
+	size_t len;            /* raw string length */
+	char priv;
+	int arg[ESC_ARG_SIZ];
+	int narg;              /* nb of args */
+	char mode[2];
+} CSIEscape;
+
+/* STR Escape sequence structs */
+/* ESC type [[ [<priv>] <arg> [;]] <mode>] ESC '\' */
+typedef struct {
+	char type;             /* ESC type ... */
+	char *buf;             /* allocated raw string */
+	size_t siz;            /* allocation size */
+	size_t len;            /* raw string length */
+	char *args[STR_ARG_SIZ];
+	int narg;              /* nb of args */
+} STREscape;
+
 /* Internal representation of the screen */
 typedef struct {
 	int cmdfd;    /* tty fd */ 
@@ -105,6 +145,8 @@ typedef struct {
 	int icharset; /* selected charset for sequence */
 	int *tabs;
 	Rune lastc;   /* last printed char outside of sequence, 0 if control */
+	CSIEscape csiescseq;
+	STREscape strescseq;
 } Term;
 
 void die(const char *, ...);
