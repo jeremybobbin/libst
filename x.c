@@ -1990,7 +1990,7 @@ run:
 	XSetLocaleModifiers("");
 	cols = MAX(cols, 1);
 	rows = MAX(rows, 1);
-	tnew(&term, cols, rows, defaultfg, defaultbg);
+	tnew(&term, cols, rows, 1000, defaultfg, defaultbg);
 	term.handler = thandler;
 	xinit(cols, rows);
 	xsetenv();

@@ -148,8 +148,12 @@ struct Term {
 	int iofd;     /* copied fd */ 
 	int row;      /* nb row */
 	int col;      /* nb col */
+	int maxrow;   /* max row in the ring buffer */
+	int maxcol;   /* max col in the ring buffer */
 	Line *line;   /* screen */
 	Line *alt;    /* alternate screen */
+	Line *buf;    /* top of the history/line ring buffer */
+	Line *altbuf; /* top of alternate screen ring buffer */
 	int *dirty;   /* dirtyness of lines */
 	TCursor c;    /* cursor */
 	TCursor cs[2];/* save points for alt & primary cursor  */
@@ -179,7 +183,7 @@ void ttoggleprinter(Term *);
 
 Line *tgetline(Term *, int); /* gets the line % rows */
 int tattrset(Term *, int);
-void tnew(Term *, int, int, int, int);
+void tnew(Term *, int, int, int, int, int);
 void tresize(Term *, int, int);
 void tfulldirt(Term *);
 void tsetdirtattr(Term *, int);
