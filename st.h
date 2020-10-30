@@ -175,6 +175,7 @@ void ttoggleprinter(Term *);
 int tattrset(Term *, int);
 void tnew(Term *, int, int);
 void tresize(Term *, int, int);
+void tfulldirt(Term *);
 void tsetdirtattr(Term *, int);
 void ttyhangup(Term *);
 int ttynew(Term *, char *, char *, char **);

@@ -342,7 +342,7 @@ zoomabs(const Arg *arg)
 	xunloadfonts();
 	xloadfonts(usedfont, arg->f);
 	cresize(0, 0);
-	tredraw(&term);
+	tfulldirt(&term);
 	xhints();
 }
 
@@ -1526,7 +1526,7 @@ xximspot(int x, int y)
 void
 expose(XEvent *ev)
 {
-	tredraw(&term);
+	tfulldirt(&term);
 }
 
 void
@@ -1556,7 +1556,7 @@ xsetmode(int set, unsigned int flags)
 	int mode = win.mode;
 	MODBIT(win.mode, set, flags);
 	if ((win.mode & MODE_REVERSE) != (mode & MODE_REVERSE))
-		tredraw(&term);
+		tfulldirt(&term);
 }
 
 int

@@ -103,7 +103,6 @@ static void tsetscroll(Term *, int, int);
 static void tswapscreen(Term *);
 static void tsetmode(Term *, int, int, int *, int);
 static int twrite(Term *, const char *, int, int);
-static void tfulldirt(Term *);
 static void tcontrolcode(Term *, uchar );
 static void tdectest(Term *, char );
 static void tdefutf8(Term *, char);
@@ -1479,7 +1478,7 @@ strhandle(Term *term)
 				 * TODO if defaultbg color is changed, borders
 				 * are dirty
 				 */
-				tredraw(term);
+				/* tredraw(term); */
 			}
 			return;
 		}
@@ -2161,11 +2160,4 @@ tdraw(Term *term)
 	xfinishdraw();
 	if (ocx != term->ocx || ocy != term->ocy)
 		xximspot(term->ocx, term->ocy);
-}
-
-void
-tredraw(Term *term)
-{
-	tfulldirt(term);
-	tdraw(term);
 }
