@@ -89,6 +89,7 @@ typedef enum {
 	ST_POINTERMOTION, /* int - whether pointermotion is set */
 	ST_CURSORSTYLE, /* int - cursor style */
 	ST_COPY,        /* char * - copy to clipboard */
+	ST_COLORNAME,   /* void * - color: arg->v[0].i, name: arg->v[1].s */
 	ST_EOF          /* uninitialized - EOF on TTY */
 } Event;
 

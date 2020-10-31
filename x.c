@@ -1656,6 +1656,7 @@ kmap(KeySym k, uint state)
 
 int
 thandler(Term *term, Event e, Arg arg) {
+	Arg *kv = arg.v;
 	switch (e) {
 	case ST_BELL:
 		xbell();
@@ -1686,6 +1687,8 @@ thandler(Term *term, Event e, Arg arg) {
 		xsetsel(arg.s);
 		xclipcopy();
 		break;
+	case ST_COLORNAME:
+		return xsetcolorname(kv[0].i, kv[1].s);
 	}
 	return 0;
 }

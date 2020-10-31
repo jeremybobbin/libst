@@ -1472,7 +1472,8 @@ strhandle(Term *term)
 			/* FALLTHROUGH */
 		case 104: /* color reset, here p = NULL */
 			j = (narg > 1) ? atoi(term->strescseq.args[1]) : -1;
-			if (xsetcolorname(j, p)) {
+			/* we comment out the if & else because all colors are assumed to be valid */
+			if (term->handler(term, ST_COLORNAME, (Arg){.v = (Arg[2]){{.i = j}, {.s = p}}})) {
 				if (par == 104 && narg <= 1)
 					return; /* color reset without parameter */
 				fprintf(stderr, "erresc: invalid color j=%d, p=%s\n",
