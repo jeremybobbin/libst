@@ -1459,8 +1459,7 @@ strhandle(Term *term)
 			if (narg > 2 && allowwindowops) {
 				dec = base64dec(term->strescseq.args[2]);
 				if (dec) {
-					/* TODO: return event for winop
-					xclipcopy(); */
+					term->handler(term, ST_COPY, (Arg){.s = dec});
 				} else {
 					fprintf(stderr, "erresc: invalid base64\n");
 				}

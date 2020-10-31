@@ -1682,6 +1682,10 @@ thandler(Term *term, Event e, Arg arg) {
 	case ST_CURSORSTYLE:
 		xsetcursor(arg.i);
 		break;
+	case ST_COPY:
+		xsetsel(arg.s);
+		xclipcopy();
+		break;
 	}
 	return 0;
 }
