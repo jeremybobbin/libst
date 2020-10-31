@@ -87,6 +87,7 @@ typedef enum {
 	ST_BELL,        /* unintialized - ascii bell, maybe xbell */
 	ST_RESET,       /* uninitialized - reset to initial state */
 	ST_POINTERMOTION, /* int - whether pointermotion is set */
+	ST_CURSORSTYLE, /* int - cursor style */
 	ST_EOF          /* uninitialized - EOF on TTY */
 } Event;
 

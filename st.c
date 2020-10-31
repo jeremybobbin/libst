@@ -1389,8 +1389,7 @@ csihandle(Term *term)
 	case ' ':
 		switch (term->csiescseq.mode[1]) {
 		case 'q': /* DECSCUSR -- Set Cursor Style */
-			if (xsetcursor(term->csiescseq.arg[0]))
-				goto unknown;
+			term->handler(term, ST_CURSORSTYLE, (Arg){.i = term->csiescseq.arg[0]});
 			break;
 		default:
 			goto unknown;
