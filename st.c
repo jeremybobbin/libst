@@ -17,7 +17,6 @@
 #include <wchar.h>
 
 #include "st.h"
-#include "win.h"
 
 #if   defined(__linux)
  #include <pty.h>
