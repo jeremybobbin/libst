@@ -162,6 +162,8 @@ struct Term {
 	int charset;  /* current charset */
 	int icharset; /* selected charset for sequence */
 	int *tabs;
+	unsigned int defaultfg;
+	unsigned int defaultbg;
 	int (*handler)(Term *, Event, Arg);
 	Rune lastc;   /* last printed char outside of sequence, 0 if control */
 	CSIEscape csiescseq;
@@ -176,7 +178,7 @@ void ttoggleprinter(Term *);
 
 Line *tgetline(Term *, int); /* gets the line % rows */
 int tattrset(Term *, int);
-void tnew(Term *, int, int);
+void tnew(Term *, int, int, int, int);
 void tresize(Term *, int, int);
 void tfulldirt(Term *);
 void tsetdirtattr(Term *, int);
@@ -210,5 +212,3 @@ extern int allowaltscreen;
 extern int allowwindowops;
 extern char *termname;
 extern unsigned int tabspaces;
-extern unsigned int defaultfg;
-extern unsigned int defaultbg;

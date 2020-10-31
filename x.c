@@ -693,7 +693,7 @@ void
 xclear(int x1, int y1, int x2, int y2)
 {
 	XftDrawRect(xw.draw,
-			&dc.col[IS_SET(MODE_REVERSE)? defaultfg : defaultbg],
+			&dc.col[IS_SET(MODE_REVERSE)? term.defaultfg : term.defaultbg],
 			x1, y1, x2-x1, y2-y1);
 }
 
@@ -1001,8 +1001,8 @@ xinit(int cols, int rows)
 		xw.t += DisplayHeight(xw.dpy, xw.scr) - win.h - 2;
 
 	/* Events */
-	xw.attrs.background_pixel = dc.col[defaultbg].pixel;
-	xw.attrs.border_pixel = dc.col[defaultbg].pixel;
+	xw.attrs.background_pixel = dc.col[term.defaultbg].pixel;
+	xw.attrs.border_pixel = dc.col[term.defaultbg].pixel;
 	xw.attrs.bit_gravity = NorthWestGravity;
 	xw.attrs.event_mask = FocusChangeMask | KeyPressMask | KeyReleaseMask
 		| ExposureMask | VisibilityChangeMask | StructureNotifyMask
@@ -1022,7 +1022,7 @@ xinit(int cols, int rows)
 			&gcvalues);
 	xw.buf = XCreatePixmap(xw.dpy, xw.win, win.w, win.h,
 			DefaultDepth(xw.dpy, xw.scr));
-	XSetForeground(xw.dpy, dc.gc, dc.col[defaultbg].pixel);
+	XSetForeground(xw.dpy, dc.gc, dc.col[term.defaultbg].pixel);
 	XFillRectangle(xw.dpy, xw.buf, dc.gc, 0, 0, win.w, win.h);
 
 	/* font spec buffer */
@@ -1258,8 +1258,8 @@ xdrawglyphfontspecs(const XftGlyphFontSpec *specs, Glyph base, int len, int x, i
 		fg = &dc.col[base.fg + 8];
 
 	if (IS_SET(MODE_REVERSE)) {
-		if (fg == &dc.col[defaultfg]) {
-			fg = &dc.col[defaultbg];
+		if (fg == &dc.col[term.defaultfg]) {
+			fg = &dc.col[term.defaultbg];
 		} else {
 			colfg.red = ~fg->color.red;
 			colfg.green = ~fg->color.green;
@@ -1270,8 +1270,8 @@ xdrawglyphfontspecs(const XftGlyphFontSpec *specs, Glyph base, int len, int x, i
 			fg = &revfg;
 		}
 
-		if (bg == &dc.col[defaultbg]) {
-			bg = &dc.col[defaultfg];
+		if (bg == &dc.col[term.defaultbg]) {
+			bg = &dc.col[term.defaultfg];
 		} else {
 			colbg.red = ~bg->color.red;
 			colbg.green = ~bg->color.green;
@@ -1375,11 +1375,11 @@ xdrawcursor(int cx, int cy, Glyph g, int ox, int oy, Glyph og)
 
 	if (IS_SET(MODE_REVERSE)) {
 		g.mode |= ATTR_REVERSE;
-		g.bg = defaultfg;
+		g.bg = term.defaultfg;
 		drawcol = dc.col[defaultrcs];
 		g.fg = defaultcs;
 	} else {
-		g.fg = defaultbg;
+		g.fg = term.defaultbg;
 		g.bg = defaultcs;
 		drawcol = dc.col[g.bg];
 	}
@@ -1508,7 +1508,7 @@ xfinishdraw(void)
 			win.h, 0, 0);
 	XSetForeground(xw.dpy, dc.gc,
 			dc.col[IS_SET(MODE_REVERSE)?
-				defaultfg : defaultbg].pixel);
+				term.defaultfg : term.defaultbg].pixel);
 }
 
 void
@@ -1988,7 +1988,7 @@ run:
 	XSetLocaleModifiers("");
 	cols = MAX(cols, 1);
 	rows = MAX(rows, 1);
-	tnew(&term, cols, rows);
+	tnew(&term, cols, rows, defaultfg, defaultbg);
 	term.handler = thandler;
 	xinit(cols, rows);
 	xsetenv();

@@ -632,8 +632,8 @@ treset(Term *term)
 
 	term->c = (TCursor){{
 		.mode = ATTR_NULL,
-		.fg = defaultfg,
-		.bg = defaultbg
+		.fg = term->defaultfg,
+		.bg = term->defaultbg
 	}, .x = 0, .y = 0, .state = CURSOR_DEFAULT};
 
 	memset(term->tabs, 0, term->col * sizeof(*term->tabs));
@@ -654,9 +654,10 @@ treset(Term *term)
 }
 
 void
-tnew(Term *term, int col, int row)
+tnew(Term *term, int col, int row, int deffg, int defbg)
 {
-	*term = (Term){ .c = { .attr = { .fg = defaultfg, .bg = defaultbg } } };
+	term->c.attr.fg = term->defaultfg = deffg;
+	term->c.attr.bg = term->defaultbg = defbg;
 	tresize(term, col, row);
 	treset(term);
 }
@@ -956,8 +957,8 @@ tsetattr(Term *term, int *attr, int l)
 				ATTR_REVERSE    |
 				ATTR_INVISIBLE  |
 				ATTR_STRUCK     );
-			term->c.attr.fg = defaultfg;
-			term->c.attr.bg = defaultbg;
+			term->c.attr.fg = term->defaultfg;
+			term->c.attr.bg = term->defaultbg;
 			break;
 		case 1:
 			term->c.attr.mode |= ATTR_BOLD;
@@ -1011,14 +1012,14 @@ tsetattr(Term *term, int *attr, int l)
 				term->c.attr.fg = idx;
 			break;
 		case 39:
-			term->c.attr.fg = defaultfg;
+			term->c.attr.fg = term->defaultfg;
 			break;
 		case 48:
 			if ((idx = tdefcolor(term, attr, &i, l)) >= 0)
 				term->c.attr.bg = idx;
 			break;
 		case 49:
-			term->c.attr.bg = defaultbg;
+			term->c.attr.bg = term->defaultbg;
 			break;
 		default:
 			if (BETWEEN(attr[i], 30, 37)) {
@@ -1480,7 +1481,7 @@ strhandle(Term *term)
 				        j, p ? p : "(null)");
 			} else {
 				/*
-				 * TODO if defaultbg color is changed, borders
+				 * TODO if term->defaultbg color is changed, borders
 				 * are dirty
 				 */
 				/* tredraw(term); */
