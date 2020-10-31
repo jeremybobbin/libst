@@ -17,12 +17,6 @@ static int borderpx = 2;
  * 5: value of shell in config.h
  */
 static char *shell = "/bin/sh";
-char *utmp = NULL;
-/* scroll program: to enable use a string like "scroll" */
-char *scroll = NULL;
-
-/* identification sequence returned in DA and DECID */
-char *vtiden = "\033[?6c";
 
 /* Kerning / character bounding-box multipliers */
 static float cwscale = 1.0;
@@ -35,16 +29,16 @@ static float chscale = 1.0;
  */
 wchar_t *worddelimiters = L" ";
 
-/* selection timeouts (in milliseconds) */
-static unsigned int doubleclicktimeout = 300;
-static unsigned int tripleclicktimeout = 600;
-
 /* alt screens */
 int allowaltscreen = 1;
 
 /* allow certain non-interactive (insecure) window operations such as:
    setting the clipboard text */
 int allowwindowops = 0;
+
+/* selection timeouts (in milliseconds) */
+static unsigned int doubleclicktimeout = 300;
+static unsigned int tripleclicktimeout = 600;
 
 /*
  * draw latency range in ms - from new content/keypress/etc until drawing.
@@ -71,9 +65,6 @@ static unsigned int cursorthickness = 2;
  * it
  */
 static int bellvolume = 0;
-
-/* default TERM value */
-char *termname = "st-256color";
 
 /*
  * spaces per tab
