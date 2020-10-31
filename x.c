@@ -1676,6 +1676,9 @@ thandler(Term *term, Event e, Arg arg) {
 	case ST_UNSET:
 		xsetmode(0, arg.ui);
 		break;
+	case ST_POINTERMOTION:
+		xsetpointermotion(arg.i);
+		break;
 	}
 	return 0;
 }

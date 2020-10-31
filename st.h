@@ -86,6 +86,7 @@ typedef enum {
 	ST_STR_ERROR,   /* char * - parse error with CSI string */
 	ST_BELL,        /* unintialized - ascii bell, maybe xbell */
 	ST_RESET,       /* uninitialized - reset to initial state */
+	ST_POINTERMOTION, /* int - whether pointermotion is set */
 	ST_EOF          /* uninitialized - EOF on TTY */
 } Event;
 

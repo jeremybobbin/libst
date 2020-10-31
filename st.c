@@ -1091,22 +1091,22 @@ tsetmode(Term *term, int priv, int set, int *args, int narg)
 				term->handler(term, !set ? ST_SET : ST_UNSET, (Arg){.ui = MODE_HIDE});
 				break;
 			case 9:    /* X10 mouse compatibility mode */
-				xsetpointermotion(0);
+				term->handler(term, ST_POINTERMOTION, (Arg){.i = 0});
 				term->handler(term, ST_UNSET, (Arg){.ui = MODE_MOUSE});
 				term->handler(term, set ? ST_SET : ST_UNSET, (Arg){.ui = MODE_MOUSEX10});
 				break;
 			case 1000: /* 1000: report button press */
-				xsetpointermotion(0);
+				term->handler(term, ST_POINTERMOTION, (Arg){.i = 0});
 				term->handler(term, ST_UNSET, (Arg){.ui = MODE_MOUSE});
 				term->handler(term, set ? ST_SET : ST_UNSET, (Arg){.ui = MODE_MOUSEBTN});
 				break;
 			case 1002: /* 1002: report motion on button press */
-				xsetpointermotion(0);
+				term->handler(term, ST_POINTERMOTION, (Arg){.i = 0});
 				term->handler(term, ST_UNSET, (Arg){.ui = MODE_MOUSE});
 				term->handler(term, set ? ST_SET : ST_UNSET, (Arg){.ui = MODE_MOUSEMOTION});
 				break;
 			case 1003: /* 1003: enable all mouse motions */
-				xsetpointermotion(set);
+				term->handler(term, ST_POINTERMOTION, (Arg){.i = set});
 				term->handler(term, ST_UNSET, (Arg){.ui = MODE_MOUSE});
 				term->handler(term, set ? ST_SET : ST_UNSET, (Arg){.ui = MODE_MOUSEMANY});
 				break;
