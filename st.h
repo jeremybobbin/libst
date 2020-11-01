@@ -150,6 +150,7 @@ struct Term {
 	int col;      /* nb col */
 	int maxrow;   /* max row in the ring buffer */
 	int maxcol;   /* max col in the ring buffer */
+	int seen;
 	Line *line;   /* screen */
 	Line *alt;    /* alternate screen */
 	Line *buf;    /* top of the history/line ring buffer */

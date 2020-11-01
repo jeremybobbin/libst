@@ -671,6 +671,7 @@ tnew(Term *term, int col, int row, int hist, int alt, int deffg, int defbg, int 
 	term->c.attr.bg = term->defaultbg = defbg;
 	term->maxcol = 0;
 	term->maxrow = hist;
+	term->seen = row;
 	term->line = term->buf = xmalloc(hist * row * sizeof(Line));
 	term->alt = term->altbuf = alt ? xmalloc(hist * row * sizeof(Line)) : NULL;
 	term->dirty = xmalloc(row * sizeof(*term->dirty));
