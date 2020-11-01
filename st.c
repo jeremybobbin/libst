@@ -614,14 +614,13 @@ tfulldirt(Term *term)
 void
 tcursor(Term *term, int mode)
 {
-	static TCursor c[2];
 	int alt = IS_SET(MODE_ALTSCREEN);
 
 	if (mode == CURSOR_SAVE) {
-		c[alt] = term->c;
+		term->cs[alt] = term->c;
 	} else if (mode == CURSOR_LOAD) {
-		term->c = c[alt];
-		tmoveto(term, c[alt].x, c[alt].y);
+		term->c = term->cs[alt];
+		tmoveto(term, term->cs[alt].x, term->cs[alt].y);
 	}
 }
 

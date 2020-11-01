@@ -152,6 +152,7 @@ struct Term {
 	Line *alt;    /* alternate screen */
 	int *dirty;   /* dirtyness of lines */
 	TCursor c;    /* cursor */
+	TCursor cs[2];/* save points for alt & primary cursor  */
 	int ocx;      /* old cursor col */
 	int ocy;      /* old cursor row */
 	int top;      /* top    scroll limit */
