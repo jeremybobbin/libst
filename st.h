@@ -167,6 +167,7 @@ struct Term {
 	int charset;  /* current charset */
 	int icharset; /* selected charset for sequence */
 	int *tabs;
+	int tabspaces;
 	unsigned int defaultfg;
 	unsigned int defaultbg;
 	int (*handler)(Term *, Event, Arg);
@@ -183,7 +184,7 @@ void ttoggleprinter(Term *);
 
 Line *tgetline(Term *, int); /* gets the line % rows */
 int tattrset(Term *, int);
-void tnew(Term *, int, int, int, int, int, int);
+void tnew(Term *, int, int, int, int, int, int, int);
 void tresize(Term *, int, int);
 void tfulldirt(Term *);
 void tsetdirtattr(Term *, int);
@@ -214,4 +215,3 @@ extern char *scroll;
 extern char *stty_args;
 extern char *vtiden;
 extern char *termname;
-extern unsigned int tabspaces;

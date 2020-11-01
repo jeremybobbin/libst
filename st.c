@@ -646,7 +646,7 @@ treset(Term *term)
 	}, .x = 0, .y = 0, .state = CURSOR_DEFAULT};
 
 	memset(term->tabs, 0, term->col * sizeof(*term->tabs));
-	for (i = tabspaces; i < term->col; i += tabspaces)
+	for (i = term->tabspaces; i < term->col; i += term->tabspaces)
 		term->tabs[i] = 1;
 	term->top = 0;
 	term->bot = term->row - 1;
@@ -665,7 +665,7 @@ treset(Term *term)
 }
 
 void
-tnew(Term *term, int col, int row, int hist, int alt, int deffg, int defbg)
+tnew(Term *term, int col, int row, int hist, int alt, int deffg, int defbg, int ts)
 {
 	term->c.attr.fg = term->defaultfg = deffg;
 	term->c.attr.bg = term->defaultbg = defbg;
@@ -676,6 +676,7 @@ tnew(Term *term, int col, int row, int hist, int alt, int deffg, int defbg)
 	term->dirty = xmalloc(row * sizeof(*term->dirty));
 	term->defaultfg = 7;
 	term->defaultbg = 0;
+	term->tabspaces = ts;
 
 	tresize(term, col, row);
 	treset(term);
@@ -2110,7 +2111,7 @@ tresize(Term *term, int col, int row)
 		memset(bp, 0, sizeof(*term->tabs) * (col - term->col));
 		while (--bp > term->tabs && !*bp)
 			/* nothing */ ;
-		for (bp += tabspaces; bp < term->tabs + col; bp += tabspaces)
+		for (bp += term->tabspaces; bp < term->tabs + col; bp += term->tabspaces)
 			*bp = 1;
 	}
 	/* update terminal size */
