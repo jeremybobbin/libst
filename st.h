@@ -183,7 +183,7 @@ void ttoggleprinter(Term *);
 
 Line *tgetline(Term *, int); /* gets the line % rows */
 int tattrset(Term *, int);
-void tnew(Term *, int, int, int, int, int);
+void tnew(Term *, int, int, int, int, int, int);
 void tresize(Term *, int, int);
 void tfulldirt(Term *);
 void tsetdirtattr(Term *, int);
@@ -213,6 +213,5 @@ extern char *utmp;
 extern char *scroll;
 extern char *stty_args;
 extern char *vtiden;
-extern int allowaltscreen;
 extern char *termname;
 extern unsigned int tabspaces;

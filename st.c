@@ -658,20 +658,21 @@ treset(Term *term)
 		tmoveto(term, 0, 0);
 		tcursor(term, CURSOR_SAVE);
 		tclearregion(term, 0, 0, term->col-1, term->row-1);
+		if (term->alt == NULL)
+			break;
 		tswapscreen(term);
 	}
 }
 
 void
-tnew(Term *term, int col, int row, int hist, int deffg, int defbg)
+tnew(Term *term, int col, int row, int hist, int alt, int deffg, int defbg)
 {
 	term->c.attr.fg = term->defaultfg = deffg;
 	term->c.attr.bg = term->defaultbg = defbg;
 	term->maxcol = 0;
 	term->maxrow = hist;
 	term->line = term->buf = xmalloc(hist * row * sizeof(Line));
-	if (allowaltscreen)
-		term->alt = term->altbuf = xmalloc(hist * row * sizeof(Line));
+	term->alt = term->altbuf = alt ? xmalloc(hist * row * sizeof(Line)) : NULL;
 	term->dirty = xmalloc(row * sizeof(*term->dirty));
 	term->defaultfg = 7;
 	term->defaultbg = 0;
@@ -1141,13 +1142,13 @@ tsetmode(Term *term, int priv, int set, int *args, int narg)
 				term->handler(term, set ? ST_SET : ST_UNSET, (Arg){.ui = MODE_8BIT});
 				break;
 			case 1049: /* swap screen & set/restore cursor as xterm */
-				if (!allowaltscreen)
+				if (!term->alt)
 					break;
 				tcursor(term, (set) ? CURSOR_SAVE : CURSOR_LOAD);
 				/* FALLTHROUGH */
 			case 47: /* swap screen */
 			case 1047:
-				if (!allowaltscreen)
+				if (term->alt == NULL)
 					break;
 				alt = IS_SET(MODE_ALTSCREEN);
 				if (alt) {
@@ -2088,7 +2089,8 @@ tresize(Term *term, int col, int row)
 	/* ensure that both src and dst are not NULL */
 	if (i > 0) {
 		term->line = tgetline(term, i);
-		term->alt = tgetaltline(term, i);
+		if (term->alt)
+			term->alt = tgetaltline(term, i);
 	}
 	/* resize to new height */
 	term->dirty = xrealloc(term->dirty, row * sizeof(*term->dirty));
@@ -2096,7 +2098,8 @@ tresize(Term *term, int col, int row)
 
 	/* resize each row to new width, zero-pad if needed */
 	for (i = 0; i < maxrow; i++) {
-		*tgetaltline(term, i)  = xrealloc(*tgetaltline(term, i),  maxcol * sizeof(Glyph));
+		if (term->alt)
+			*tgetaltline(term, i)  = xrealloc(*tgetaltline(term, i),  maxcol * sizeof(Glyph));
 		*tgetline(term, i) = xrealloc(*tgetline(term, i), maxcol * sizeof(Glyph));
 	}
 
@@ -2126,8 +2129,12 @@ tresize(Term *term, int col, int row)
 		if (row > term->maxrow && mincol > 0) {
 			tclearregion(term, 0, minrow, maxcol - 1, maxrow - 1);
 		}
-		tswapscreen(term);
 		tcursor(term, CURSOR_LOAD);
+		if (term->alt == NULL) {
+			tfulldirt(term);
+			break;
+		}
+		tswapscreen(term);
 	}
 	term->c = c;
 	term->maxcol = maxcol;
