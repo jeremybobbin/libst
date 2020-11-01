@@ -209,6 +209,5 @@ extern char *scroll;
 extern char *stty_args;
 extern char *vtiden;
 extern int allowaltscreen;
-extern int allowwindowops;
 extern char *termname;
 extern unsigned int tabspaces;

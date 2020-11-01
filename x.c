@@ -1684,6 +1684,8 @@ thandler(Term *term, Event e, Arg arg) {
 		xsetcursor(arg.i);
 		break;
 	case ST_COPY:
+		if (!allowwindowops)
+			return 1;
 		xsetsel(arg.s);
 		xclipcopy();
 		break;

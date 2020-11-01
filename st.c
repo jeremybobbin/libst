@@ -1457,7 +1457,7 @@ strhandle(Term *term)
 				term->handler(term, ST_BELL, (Arg){.s = term->strescseq.args[1]});
 			return;
 		case 52:
-			if (narg > 2 && allowwindowops) {
+			if (narg > 2) {
 				dec = base64dec(term->strescseq.args[2]);
 				if (dec) {
 					term->handler(term, ST_COPY, (Arg){.s = dec});
