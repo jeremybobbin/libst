@@ -8,13 +8,13 @@
  * 4: value of shell in /etc/passwd
  * 5: value of shell in config.h
  */
-static char *shell = "/bin/sh";
-char *utmp = NULL;
+#define SHELL "/bin/sh"
+#define UTMP NULL
 /* scroll program: to enable use a string like "scroll" */
-char *scroll = NULL;
+#define SCROLL NULL
 
 /* identification sequence returned in DA and DECID */
-char *vtiden = "\033[?6c";
+#define VTIDEN "\033[?6c"
 
 /* default TERM value */
-char *termname = "st-256color";
+#define TERMNAME "st-256color"

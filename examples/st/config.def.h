@@ -66,6 +66,9 @@ static unsigned int cursorthickness = 2;
  */
 static int bellvolume = 0;
 
+/* default X11 Class Hint value */
+#define TERMNAME "st-256color"
+
 /*
  * spaces per tab
  *

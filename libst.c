@@ -357,11 +357,11 @@ execsh(char *cmd, char **args)
 	if (args) {
 		prog = args[0];
 		arg = NULL;
-	} else if (scroll) {
-		prog = scroll;
-		arg = utmp ? utmp : sh;
-	} else if (utmp) {
-		prog = utmp;
+	} else if (SCROLL) {
+		prog = SCROLL;
+		arg = UTMP ? UTMP : sh;
+	} else if (UTMP) {
+		prog = UTMP;
 		arg = NULL;
 	} else {
 		prog = sh;
@@ -376,7 +376,7 @@ execsh(char *cmd, char **args)
 	setenv("USER", pw->pw_name, 1);
 	setenv("SHELL", sh, 1);
 	setenv("HOME", pw->pw_dir, 1);
-	setenv("TERM", termname, 1);
+	setenv("TERM", TERMNAME, 1);
 
 	signal(SIGCHLD, SIG_DFL);
 	signal(SIGHUP, SIG_DFL);
@@ -1321,7 +1321,7 @@ csihandle(Term *term)
 		break;
 	case 'c': /* DA -- Device Attributes */
 		if (term->csiescseq.arg[0] == 0)
-			ttywrite(term, vtiden, strlen(vtiden), 0);
+			ttywrite(term, VTIDEN, strlen(VTIDEN), 0);
 		break;
 	case 'b': /* REP -- if last char is printable print it <n> more times */
 		DEFAULT(term->csiescseq.arg[0], 1);
@@ -1855,7 +1855,7 @@ tcontrolcode(Term *term, uchar ascii)
 	case 0x99:   /* TODO: SGCI */
 		break;
 	case 0x9a:   /* DECID -- Identify Terminal */
-		ttywrite(term, vtiden, strlen(vtiden), 0);
+		ttywrite(term, VTIDEN, strlen(VTIDEN), 0);
 		break;
 	case 0x9b:   /* TODO: CSI */
 	case 0x9c:   /* TODO: ST */
@@ -1927,7 +1927,7 @@ eschandle(Term *term, uchar ascii)
 		}
 		break;
 	case 'Z': /* DECID -- Identify Terminal */
-		ttywrite(term, vtiden, strlen(vtiden), 0);
+		ttywrite(term, VTIDEN, strlen(VTIDEN), 0);
 		break;
 	case 'c': /* RIS -- Reset to initial state */
 		treset(term);
