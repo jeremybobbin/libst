@@ -390,22 +390,40 @@ execsh(char *cmd, char **args)
 }
 
 int
-ttynew(Term *term, char *cmd, char *out, char **args)
+ttynew(Term *term, char *cmd, char *iofname, char **args, int *in, int *out, int *err)
 {
 	int m, s;
+	struct winsize ws;
+	ws.ws_row = term->row;
+	ws.ws_col = term->col;
+	int ipipe[2], opipe[2], epipe[2];
 
-	if (out) {
+	if (in && pipe(ipipe) == -1) {
+		*in = -1;
+		in = NULL;
+	}
+	if (out && pipe(opipe) == -1) {
+		*out = -1;
+		out = NULL;
+	}
+	if (err && pipe(epipe) == -1) {
+		*err = -1;
+		err = NULL;
+	}
+
+
+	if (iofname) {
 		term->mode |= MODE_PRINT;
-		term->iofd = (!strcmp(out, "-")) ?
-			  1 : open(out, O_WRONLY | O_CREAT, 0666);
+		term->iofd = (!strcmp(iofname, "-")) ?
+			  1 : open(iofname, O_WRONLY | O_CREAT, 0666);
 		if (term->iofd < 0) {
 			fprintf(stderr, "Error opening %s:%s\n",
-				out, strerror(errno));
+				iofname, strerror(errno));
 		}
 	}
 
 	/* seems to work fine on linux, openbsd and freebsd */
-	if (openpty(&m, &s, NULL, NULL, NULL) < 0)
+	if (openpty(&m, &s, NULL, NULL, &ws) < 0)
 		die("openpty failed: %s\n", strerror(errno));
 
 	switch (term->pid = fork()) {
@@ -415,9 +433,21 @@ ttynew(Term *term, char *cmd, char *out, char **args)
 	case 0:
 		close(term->iofd);
 		setsid(); /* create a new process group */
-		dup2(s, 0);
-		dup2(s, 1);
-		dup2(s, 2);
+		if (in) {
+			close(ipipe[1]);
+			dup2(ipipe[0], STDIN_FILENO);
+			close(ipipe[0]);
+		} else dup2(s, 0);
+		if (out) {
+			close(opipe[0]);
+			dup2(opipe[1], STDOUT_FILENO);
+			close(opipe[1]);
+		} else dup2(s, 1);
+		if (err) {
+			close(epipe[0]);
+			dup2(epipe[1], STDERR_FILENO);
+			close(epipe[1]);
+		} else dup2(s, 2);
 		if (ioctl(s, TIOCSCTTY, NULL) < 0)
 			die("ioctl TIOCSCTTY failed: %s\n", strerror(errno));
 		close(s);
@@ -436,6 +466,19 @@ ttynew(Term *term, char *cmd, char *out, char **args)
 		close(s);
 		term->cmdfd = m;
 		break;
+	}
+
+	if (in) {
+		close(ipipe[0]);
+		*in = ipipe[1];
+	}
+	if (out) {
+		close(opipe[1]);
+		*out = opipe[0];
+	}
+	if (err) {
+		close(epipe[1]);
+		*out = epipe[0];
 	}
 	return term->cmdfd;
 }

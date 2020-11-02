@@ -1839,7 +1839,7 @@ run(void)
 		}
 	} while (ev.type != MapNotify);
 
-	ttyfd = ttynew(&term, shell, opt_io, opt_cmd);
+	ttyfd = ttynew(&term, shell, opt_io, opt_cmd, NULL, NULL, NULL);
 	signal(SIGCHLD, sigchld);
 	cresize(w, h);
 
