@@ -163,6 +163,17 @@ xrealloc(void *p, size_t len)
 	return p;
 }
 
+void *
+xcalloc(size_t nmemb, size_t size)
+{
+	void *p;
+	if ((p = calloc(nmemb, size)) == NULL)
+		die("realloc: %s\n", strerror(errno));
+
+	return p;
+}
+
+
 char *
 xstrdup(char *s)
 {
@@ -495,9 +506,9 @@ ttyread(Term *term)
 
 	switch (ret) {
 	case 0:
-		exit(0);
 	case -1:
-		die("couldn't read from shell: %s\n", strerror(errno));
+		term->handler(term, ST_EOF, (Arg){0});
+		break;
 	default:
 		buflen += ret;
 		written = twrite(term, buf, buflen, 0);
@@ -717,12 +728,11 @@ tnew(int col, int row, int hist, int alt, int deffg, int defbg, int ts)
 	term->maxcol = 0;
 	term->maxrow = hist;
 	term->seen = row;
-	term->line = term->buf = xmalloc(hist * row * sizeof(Line));
-	term->alt = term->altbuf = alt ? xmalloc(hist * row * sizeof(Line)) : NULL;
+	term->line = term->buf = xcalloc(row * sizeof(Line), hist);
+	term->alt = term->altbuf = alt ? xcalloc(row * sizeof(Line), hist) : NULL;
 	term->tabspaces = ts;
 
-	tresize(term, col, row);
-	treset(term);
+	tresize(term, col, row); treset(term);
 	return term;
 }
 
