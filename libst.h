@@ -208,7 +208,8 @@ void ttoggleprinter(Term *);
 
 Line *tgetline(Term *, int); /* gets the line % rows */
 int tattrset(Term *, int);
-void tnew(Term *, int, int, int, int, int, int, int);
+Term *tnew(int, int, int, int, int, int, int);
+void tfree(Term *);
 void tresize(Term *, int, int);
 void tfulldirt(Term *);
 void tsetdirtattr(Term *, int);

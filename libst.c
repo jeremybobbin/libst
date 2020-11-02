@@ -706,9 +706,12 @@ treset(Term *term)
 	}
 }
 
-void
-tnew(Term *term, int col, int row, int hist, int alt, int deffg, int defbg, int ts)
+Term *
+tnew(int col, int row, int hist, int alt, int deffg, int defbg, int ts)
 {
+	Term *term;
+	if ((term = calloc(1, sizeof(Term))) == NULL)
+		return NULL;
 	term->c.attr.fg = term->defaultfg = deffg;
 	term->c.attr.bg = term->defaultbg = defbg;
 	term->maxcol = 0;
@@ -716,13 +719,31 @@ tnew(Term *term, int col, int row, int hist, int alt, int deffg, int defbg, int 
 	term->seen = row;
 	term->line = term->buf = xmalloc(hist * row * sizeof(Line));
 	term->alt = term->altbuf = alt ? xmalloc(hist * row * sizeof(Line)) : NULL;
-	term->dirty = xmalloc(row * sizeof(*term->dirty));
-	term->defaultfg = 7;
-	term->defaultbg = 0;
 	term->tabspaces = ts;
 
 	tresize(term, col, row);
 	treset(term);
+	return term;
+}
+
+void
+tfree(Term *term)
+{
+	int i;
+	for (i = 0; i < term->maxcol; i++) {
+		free(term->buf[i]);
+	}
+	if (term->altbuf) {
+		for (i = 0; i < term->maxcol; i++) {
+			free(term->altbuf[i]);
+		}
+	}
+	free(term->buf);
+	free(term->altbuf);
+	free(term->dirty);
+	free(term->tabs);
+	free(term->strescseq.buf);
+	free(term);
 }
 
 void
