@@ -925,8 +925,10 @@ tclearregion(Term *term, int x1, int y1, int x2, int y2)
 	if (y1 > y2)
 		temp = y1, y1 = y2, y2 = temp;
 
-	for (y = y1; y <= y2; y++) {
+	for (y = y1; y <= MIN(y2, term->row-1); y++)
 		term->dirty[y] = 1;
+
+	for (y = y1; y <= y2; y++) {
 		for (x = x1; x <= x2; x++) {
 			gp = *tgetline(term, y) + x;
 			gp->fg = term->c.attr.fg;
@@ -2199,7 +2201,7 @@ tresize(Term *term, int col, int row)
 	c = term->c;
 	for (i = 0; i < 2; i++) {
 		if (col > term->maxcol && minrow > 0) {
-			tclearregion(term, mincol, 0, maxcol - 1, row - 1);
+			tclearregion(term, mincol, 0, maxcol - 1, maxrow - 1);
 		}
 		if (row > term->maxrow && mincol > 0) {
 			tclearregion(term, 0, minrow, maxcol - 1, maxrow - 1);
