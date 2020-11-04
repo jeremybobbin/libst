@@ -783,12 +783,22 @@ tscrolldown(Term *term, int orig, int n, int copyhist)
 	LIMIT(n, 0, term->bot-orig+1);
 
 	tsetdirt(term, orig, term->bot-n);
-	tclearregion(term, 0, term->bot-n+1, term->col-1, term->bot);
 
-	for (i = term->bot; i >= orig+n; i--) {
-		temp = *tgetline(term, i);
-		*tgetline(term, i) = (*tgetline(term, i-n));
-		(*tgetline(term, i-n)) = temp;
+	if (copyhist && orig == 0 && (term->maxrow > n + term->row)) {
+		tclearregion(term, 0, term->bot-n+1, term->col-1, term->bot);
+		for (i = term->bot-n+1; i < term->row-n; i++) {
+			temp = *tgetline(term, i);
+			*tgetline(term, i) = *tgetline(term, i+n);
+			*tgetline(term, i+n) = temp;
+		}
+		term->line = tgetline(term, -n);
+	} else {
+		tclearregion(term, 0, term->bot-n+1, term->col-1, term->bot);
+		for (i = term->bot; i >= orig+n; i--) {
+			temp = *tgetline(term, i);
+			*tgetline(term, i) = *tgetline(term, i-n);
+			*tgetline(term, i-n) = temp;
+		}
 	}
 }
 
@@ -801,13 +811,29 @@ tscrollup(Term *term, int orig, int n, int copyhist)
 
 	LIMIT(n, 0, term->bot-orig+1);
 
-	tclearregion(term, 0, orig, term->col-1, orig+n-1);
-	tsetdirt(term, orig+n, term->bot);
+	/* dirty the ones which will remain on screen */
 
-	for (i = orig; i <= term->bot-n; i++) {
-		temp = *tgetline(term, i);
-		*tgetline(term, i) = (*tgetline(term, i+n));
-		(*tgetline(term, i+n)) = temp;
+	if (copyhist && orig == 0 && term->maxrow > (n + term->row)) {
+		/* clear the rows which will rise from beneath */
+		tclearregion(term, 0, term->row, term->col-1, term->row+n);
+		tsetdirt(term, orig, term->bot);
+		/* since we set term->line, when term->bot is manipulated,
+		 * we need shift lines[bot..row] upwards */
+		term->line = tgetline(term, n);
+		for (i = term->row-1; i > term->bot; i--) {
+			temp = *tgetline(term, i);
+			*tgetline(term, i) = *tgetline(term, i-n);
+			*tgetline(term, i-n) = temp;
+		}
+		term->seen = MIN(term->seen + n, term->maxrow);
+	} else {
+		tclearregion(term, 0, orig, term->col-1, orig+n-1);
+		tsetdirt(term, orig+n, term->bot);
+		for (i = orig; i <= term->bot-n; i++) {
+			temp = *tgetline(term, i);
+			*tgetline(term, i) = *tgetline(term, i+n);
+			*tgetline(term, i+n) = temp;
+		}
 	}
 }
 
