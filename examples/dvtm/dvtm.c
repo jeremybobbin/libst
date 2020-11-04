@@ -173,6 +173,10 @@ typedef struct {
 #define MAX(x, y)   ((x) > (y) ? (x) : (y))
 #define MIN(x, y)   ((x) < (y) ? (x) : (y))
 #define TAGMASK     ((1 << LENGTH(tags)) - 1)
+#define TRUERED(x)		(((x) & 0xff0000) >> 16)
+#define TRUEGREEN(x)		(((x) & 0xff00) >> 8)
+#define TRUEBLUE(x)		(((x) & 0xff))
+
 
 #ifdef NDEBUG
  #define debug(format, args...)
@@ -449,13 +453,77 @@ unsigned int color_hash(short fg, short bg)
 	return fg * (COLORS + 2) + bg;
 }
 
-short
-vt_color_get(Term *t, short fg, short bg)
+/* the following 3 "colour" functions have been stolen from tmux */
+static int
+colour_dist_sq(int R, int G, int B, int r, int g, int b)
 {
-	if (fg >= COLORS || fg < 0)
+	return ((R - r) * (R - r) + (G - g) * (G - g) + (B - b) * (B - b));
+}
+
+static int
+colour_to_6cube(int v)
+{
+	if (v < 48)
+		return (0);
+	if (v < 114)
+		return (1);
+	return ((v - 35) / 40);
+}
+
+int
+colour_find_rgb(unsigned char r, unsigned char g, unsigned char b)
+{
+	static const int	q2c[6] = { 0x00, 0x5f, 0x87, 0xaf, 0xd7, 0xff };
+	int			qr, qg, qb, cr, cg, cb, d, idx;
+	int			grey_avg, grey_idx, grey;
+
+	/* Map RGB to 6x6x6 cube. */
+	qr = colour_to_6cube(r); cr = q2c[qr];
+	qg = colour_to_6cube(g); cg = q2c[qg];
+	qb = colour_to_6cube(b); cb = q2c[qb];
+
+	/* If we have hit the colour exactly, return early. */
+	if (cr == r && cg == g && cb == b)
+		return ((16 + (36 * qr) + (6 * qg) + qb));
+
+	/* Work out the closest grey (average of RGB). */
+	grey_avg = (r + g + b) / 3;
+	if (grey_avg > 238)
+		grey_idx = 23;
+	else
+		grey_idx = (grey_avg - 3) / 10;
+	grey = 8 + (10 * grey_idx);
+
+	/* Is grey or 6x6x6 colour closest? */
+	d = colour_dist_sq(cr, cg, cb, r, g, b);
+	if (colour_dist_sq(grey, grey, grey, r, g, b) < d)
+		idx = 232 + grey_idx;
+	else
+		idx = 16 + (36 * qr) + (6 * qg) + qb;
+	return (idx);
+}
+
+short
+vt_color_get(Term *t, int fg, int bg)
+{
+	unsigned int r, g, b;
+	if (fg < 0)
 		fg = defaultfg;
-	if (bg >= COLORS || bg < 0)
+	else if (fg > COLORS) {
+		r = TRUERED(fg);
+		g = TRUEGREEN(fg);
+		b = TRUEBLUE(fg);
+		fg = colour_find_rgb(r, g, b);
+	}
+
+	if (bg < 0)
 		bg = defaultbg;
+	else if (bg > COLORS) {
+		r = TRUERED(bg)   / 32;
+		g = TRUEGREEN(bg) / 32;
+		b = TRUEBLUE(bg)  / 64;
+		fg = colour_find_rgb(r, g, b);
+	}
 
 	if (!color2palette)
 		return 0;
@@ -508,7 +576,8 @@ init_colors(void)
 	has_default_colors = (use_default_colors() == OK);
 	color_pairs_max = MIN(COLOR_PAIRS, SHRT_MAX);
 	if (COLORS)
-		color2palette = calloc((COLORS + 2) * (COLORS + 2), sizeof(short));
+		color2palette = calloc(2 * (COLORS + 2) * (COLORS + 2), sizeof(short));
+
 	/*
 	 * XXX: On undefined color-pairs NetBSD curses pair_content() set fg
 	 *      and bg to default colors while ncurses set them respectively to
