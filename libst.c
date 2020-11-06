@@ -727,7 +727,7 @@ tnew(int col, int row, int hist, int alt, int deffg, int defbg, int ts)
 	term->c.attr.bg = term->defaultbg = defbg;
 	term->maxcol = 0;
 	term->maxrow = hist;
-	term->seen = row;
+	term->seen = 0;
 	term->line = term->buf = xcalloc(row * sizeof(Line), hist);
 	term->alt = term->altbuf = alt ? xcalloc(row * sizeof(Line), hist) : NULL;
 	term->tabspaces = ts;
@@ -2173,6 +2173,8 @@ tresize(Term *term, int col, int row)
 	int mincol = MIN(col, term->col);
 	int maxrow = MAX(row, term->maxrow);
 	int maxcol = MAX(col, term->maxcol);
+	int orow = term->row;
+	int delta = row - term->row;
 	int *bp;
 	/* offsets into views */
 	TCursor c;
@@ -2183,18 +2185,6 @@ tresize(Term *term, int col, int row)
 		return;
 	}
 
-	/*
-	 * slide screen to keep cursor where we expect it -
-	 * tscrollup would work here, but we can optimize to
-	 * memmove because we're freeing the earlier lines
-	 */
-	i = term->c.y - row;
-	/* ensure that both src and dst are not NULL */
-	if (i > 0) {
-		term->line = tgetline(term, i);
-		if (term->alt)
-			term->alt = tgetaltline(term, i);
-	}
 	/* resize to new height */
 	term->dirty = xrealloc(term->dirty, row * sizeof(*term->dirty));
 	term->tabs = xrealloc(term->tabs, maxcol * sizeof(*term->tabs));
@@ -2221,18 +2211,37 @@ tresize(Term *term, int col, int row)
 	term->row = row;
 	/* reset scrolling region */
 	tsetscroll(term, 0, row-1);
-	/* make use of the LIMIT in tmoveto */
-	tmoveto(term, term->c.x, term->c.y);
 	/* Clearing both screens (it makes dirty all lines) */
 	c = term->c;
+
+	/* two buffers, one cursor - we adjust the cursor pos once */
+	if (delta > 0) {
+		/* growing */
+		if (term->seen < term->maxrow &&  delta > (term->line - term->buf)) {
+			/* When first openning the terminal,
+			 * we don't want to look before the start of the ring buffer.
+			 */
+			term->seen = term->line - term->buf + row;
+			delta = 0;
+		}
+		c.y += delta;
+	}
+	if (delta < 0) {
+		/* shrinking */
+		if (c.y < row) {
+			delta = 0;
+		}
+		c.y += delta;
+	}
 	for (i = 0; i < 2; i++) {
 		if (col > term->maxcol && minrow > 0) {
 			tclearregion(term, mincol, 0, maxcol - 1, maxrow - 1);
 		}
-		if (row > term->maxrow && mincol > 0) {
-			tclearregion(term, 0, minrow, maxcol - 1, maxrow - 1);
+		if (row > orow && delta == 0 && mincol > 0) {
+			tclearregion(term, 0, minrow, maxcol - 1, row - 1);
 		}
 		tcursor(term, CURSOR_LOAD);
+		term->line = tgetline(term, -delta);
 		if (term->alt == NULL) {
 			tfulldirt(term);
 			break;
@@ -2240,6 +2249,7 @@ tresize(Term *term, int col, int row)
 		tswapscreen(term);
 	}
 	term->c = c;
+	term->maxrow = maxrow;
 	term->maxcol = maxcol;
 }
 
