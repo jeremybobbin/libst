@@ -1176,6 +1176,7 @@ keypress(int code) {
 				tkeypress(c->term, code);
 			if (key != -1)
 				tkeypress(c->term, key);
+			tscroll(c, 0);
 		}
 		if (!runinall)
 			break;
