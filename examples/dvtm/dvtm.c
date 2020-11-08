@@ -302,7 +302,7 @@ nextvisible(Client *c) {
 static Client*
 bypid(pid_t pid) {
 	for (Client *c = clients; c; c = c->next)
-		if (c->pid == pid)
+		if (c->term->pid == pid)
 			return c;
 	return NULL;
 }
@@ -926,7 +926,7 @@ sigchld_handler(int sig) {
 		debug("child with pid %d died\n", pid);
 
 		for (Client *c = clients; c; c = c->next) {
-			if (c->pid == pid) {
+			if (c->term->pid == pid) {
 				c->died = true;
 				break;
 			}
@@ -1239,7 +1239,7 @@ static char *getcwd_by_pid(Client *c) {
 	if (!c)
 		return NULL;
 	char buf[32];
-	snprintf(buf, sizeof buf, "/proc/%d/cwd", c->pid);
+	snprintf(buf, sizeof buf, "/proc/%d/cwd", c->term->pid);
 	return realpath(buf, NULL);
 }
 
@@ -1353,14 +1353,14 @@ create(const char *args[]) {
 
 	c->term->handler = event_handler;
 	/* ttynew(Term *term, char *cmd, char *iofname, char **args, int *in, int *out, int *err) */
-	c->pid = ttynew(c->term, shell, NULL, pargs, NULL, NULL, NULL);
+	ttynew(c->term, shell, NULL, pargs, NULL, NULL, NULL);
 	if (args && args[2] && !strcmp(args[2], "$CWD"))
 		free(cwd);
 
 	applycolorrules(c);
 	c->x = wax;
 	c->y = way;
-	debug("client with pid %d forked\n", c->pid);
+	debug("client with pid %d forked\n", c->term->pid);
 	attach(c);
 	focus(c);
 	arrange();
@@ -1643,8 +1643,8 @@ static void
 killclient(const char *args[]) {
 	if (!sel)
 		return;
-	debug("killing client with pid: %d\n", sel->pid);
-	kill(-sel->pid, SIGKILL);
+	debug("killing client with pid: %d\n", sel->term->pid);
+	kill(-sel->term->pid, SIGKILL);
 }
 
 static void
