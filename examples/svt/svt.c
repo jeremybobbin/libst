@@ -59,9 +59,6 @@ typedef struct {
 typedef struct Client Client;
 struct Client {
 	Term *term;
-	Term *editor, *app;
-	int editor_fds[2];
-	int cursor_vis;
 	volatile sig_atomic_t editor_died;
 	const char *cmd;
 	char title[255];
@@ -72,7 +69,6 @@ struct Client {
 	unsigned short int y;
 	unsigned short int w;
 	unsigned short int h;
-	bool has_title_line;
 	bool minimized;
 	bool urgent;
 	volatile sig_atomic_t died;
@@ -117,22 +113,13 @@ typedef struct {
 } Cmd;
 
 typedef struct {
+	const char *name;
 	int fd;
-	const char *file;
-	unsigned short int id;
-} CmdFifo;
-
-typedef struct {
-	char *name;
-	const char *argv[4];
-	bool filter;
-	bool color;
-} Editor;
+} File;
 
 #define LENGTH(arr) (sizeof(arr) / sizeof((arr)[0]))
 #define MAX(x, y)   ((x) > (y) ? (x) : (y))
 #define MIN(x, y)   ((x) < (y) ? (x) : (y))
-#define TAGMASK     ((1 << LENGTH(tags)) - 1)
 #define TRUERED(x)		(((x) & 0xff0000) >> 16)
 #define TRUEGREEN(x)		(((x) & 0xff00) >> 8)
 #define TRUEBLUE(x)		(((x) & 0xff))
@@ -146,7 +133,7 @@ typedef struct {
 
 /* commands for use by keybindings */
 static void create(const char *args[]);
-static void copymode(const char *args[]);
+static void dump(const char *args[]);
 static void killclient(const char *args[]);
 static void quit(const char *args[]);
 static void redraw(const char *args[]);
@@ -184,7 +171,8 @@ static Client *msel = NULL;
 static unsigned int seltags;
 static unsigned int tagset[2] = { 1, 1 };
 static bool mouse_events_enabled = ENABLE_MOUSE;
-static CmdFifo cmdfifo = { .fd = -1 };
+static File cmdfifo = { .fd = -1 };
+static File ofile = { .fd = -1 };
 static const char *shell;
 static volatile sig_atomic_t running = true;
 static bool runinall = false;
@@ -417,7 +405,7 @@ stattr_to_curses(enum glyph_attribute in)
 }
 
 void
-tdraw(Client *c, Term *t, int srow, int scol)
+tdraw(Client *c, Term *t)
 {
 	Glyph *row, *prev_cell, *cell;
 	int i, j;
@@ -426,7 +414,7 @@ tdraw(Client *c, Term *t, int srow, int scol)
 			continue;
 
 		row = *tgetline(t, i-c->scroll);
-		move(srow + i, scol);
+		move(i, 0);
 		for (j = 0, cell = row, prev_cell = NULL; j < t->col; j++, prev_cell = cell, cell = row + j) {
 			if (!prev_cell || cell->mode != prev_cell->mode
 			    || cell->fg != prev_cell->fg
@@ -454,12 +442,12 @@ tdraw(Client *c, Term *t, int srow, int scol)
 		t->dirty[i] = false;
 	}
 
-	move(srow + t->c.y, scol + t->c.x);
+	move(t->c.y, t->c.x);
 }
 
 static void
 draw_content(Client *c) {
-	tdraw(c, c->term, c->has_title_line, 0);
+	tdraw(c, c->term);
 }
 
 static void
@@ -494,13 +482,8 @@ resize_client(Client *c, int w, int h) {
 		c->h = h;
 	}
 	if (resize_window) {
-		c->has_title_line = 0;
-		tresize(c->app, w, h);
-		ttyresize(c->app, w, h);
-		if (c->editor) {
-			tresize(c->editor, w, h);
-			ttyresize(c->editor, w, h);
-		}
+		tresize(c->term, w, h);
+		ttyresize(c->term, w, h);
 	}
 }
 
@@ -529,10 +512,6 @@ sigchld_handler(int sig) {
 
 		if (c->term->pid == pid) {
 			c->died = true;
-			break;
-		}
-		if (c->editor && c->editor->pid == pid) {
-			c->editor_died = true;
 			break;
 		}
 	}
@@ -689,8 +668,8 @@ cleanup(void) {
 	endwin();
 	if (cmdfifo.fd > 0)
 		close(cmdfifo.fd);
-	if (cmdfifo.file)
-		unlink(cmdfifo.file);
+	if (cmdfifo.name)
+		unlink(cmdfifo.name);
 }
 
 static char *getcwd_by_pid(Client *c) {
@@ -714,11 +693,7 @@ event_handler(Term *term, Event e, Arg arg) {
 		strncpy(c->title, arg.s ? arg.s : "", sizeof(c->title) - 1);
 		break;
 	case ST_EOF:
-		if (term == c->editor) {
-			c->editor_died = true;
-			break;
-		}
-		if (term == c->term || term == c->app) {
+		if (term == c->term) {
 			c->died = true;
 			break;
 		}
@@ -757,11 +732,9 @@ create(const char *args[]) {
 	if (!c)
 		return;
 	c->tags = tagset[seltags];
-	c->id = ++cmdfifo.id;
-	snprintf(buf, sizeof buf, "%d", c->id);
 
 	/* Term *term, int col, int row, int hist, int alt, int deffg, int defbg, int ts */
-	c->term = c->app = tnew(screen.w, screen.h, screen.history, 1, 7, 0, 8);
+	c->term = tnew(screen.w, screen.h, screen.history, 1, defaultfg, defaultbg, 8);
 	if (!c->term) {
 		free(c);
 		return;
@@ -878,57 +851,38 @@ size_t tgetcontent(Term *t, char **buf, bool colored)
 }
 
 static void
-copymode(const char *args[]) {
-	if (!args || !args[0] || !c || c->editor)
+dump(const char *args[]) {
+	size_t len;
+	char *buf, *cur;
+	bool colored;
+	if (!c || ofile.name == NULL)
 		return;
 
-	bool colored = strstr(args[0], "pager") != NULL;
-
-	if (!(c->editor = tnew(screen.w, screen.h, screen.h, 1, 0, 7, 8)))
-		return;
-
-	int *to = &c->editor_fds[0];
-	int *from = strstr(args[0], "editor") ? &c->editor_fds[1] : NULL;
-	c->editor_fds[0] = c->editor_fds[1] = -1;
-
-	const char *argv[3] = { args[0], NULL, NULL };
-	char argline[32];
-	/*
-	int line = vt_content_start(c->app);
-	snprintf(argline, sizeof(argline), "+%d", line);
-	argv[1] = argline;
-	*/
-
-	c->editor->handler = event_handler;
-	if (ttynew(c->editor, args[0], NULL, argv, to, from, NULL) < 0) {
-		tfree(c->editor);
-		c->editor = NULL;
+	if ((ofile.fd = open(ofile.name, O_RDWR|O_NONBLOCK|O_CREAT, 0600)) == -1) {
+		error("%s\n", strerror(errno));
 		return;
 	}
 
-	c->term = c->editor;
+	if (args && args[0]) {
+		colored = strstr(args[0], "uncolored") == NULL;
+	} else {
+		colored = false;
+	}
 
-	if (c->editor_fds[0] != -1) {
-		char *buf = NULL;
-		size_t len = tgetcontent(c->app, &buf, colored);
-		char *cur = buf;
-		while (len > 0) {
-			ssize_t res = write(c->editor_fds[0], cur, len);
-			if (res < 0) {
-				if (errno == EAGAIN || errno == EINTR)
-					continue;
-				break;
-			}
-			cur += res;
-			len -= res;
+	len = tgetcontent(c->term, &buf, colored);
+	cur = buf;
+	while (len > 0) {
+		ssize_t res = write(ofile.fd, cur, len);
+		if (res < 0) {
+			if (errno == EAGAIN || errno == EINTR)
+				continue;
+			break;
 		}
-		free(buf);
-		close(c->editor_fds[0]);
-		c->editor_fds[0] = -1;
+		cur += res;
+		len -= res;
 	}
-
-	if (args[1])
-		ttywrite(c->editor, args[1], strlen(args[1]), 0);
+	free(buf);
+	close(ofile.fd);
 }
 
 static void
@@ -1071,18 +1025,6 @@ handle_cmdfifo(void) {
 	}
 }
 
-static void
-handle_editor(Client *c) {
-	c->editor_died = false;
-	c->editor_fds[1] = -1;
-	tfree(c->editor);
-	c->editor = NULL;
-	c->term = c->app;
-	tfulldirt(c->term);
-	draw_content(c);
-	refresh();
-}
-
 static int
 open_or_create_fifo(const char *name, const char **name_created) {
 	struct stat info;
@@ -1109,7 +1051,7 @@ static void
 usage(void) {
 	cleanup();
 	eprint("usage: svt [-v] [-M] [-m mod] [-d delay] [-h lines] [-t title] "
-	       "[-s status-fifo] [-c cmd-fifo] [cmd...]\n");
+	       "[-s status-fifo] [-c cmd-fifo] [-o dump-file] [cmd...]\n");
 	exit(EXIT_FAILURE);
 }
 
@@ -1164,11 +1106,16 @@ parse_args(int argc, char *argv[]) {
 				title = argv[++arg];
 				break;
 			case 'c': {
-				const char *fifo;
-				cmdfifo.fd = open_or_create_fifo(argv[++arg], &cmdfifo.file);
-				if (!(fifo = realpath(argv[arg], NULL)))
+				const char *fname;
+				cmdfifo.fd = open_or_create_fifo(argv[++arg], &cmdfifo.name);
+				if (!(fname = realpath(argv[arg], NULL)))
 					error("%s\n", strerror(errno));
-				setenv("SVT_CMD_FIFO", fifo, 1);
+				setenv("SVT_CMD_FIFO", fname, 1);
+				break;
+			}
+			case 'o': {
+				const char *fname = ofile.name = argv[++arg];
+				setenv("SVT_OUT_FIFO", fname, 1);
 				break;
 			}
 			default:
@@ -1214,13 +1161,9 @@ main(int argc, char *argv[]) {
 			nfds = cmdfifo.fd;
 		}
 
-		if (c->editor && c->editor_died)
-			handle_editor(c);
-		if (!c->editor && c->died) {
-			destroy(c);
-			continue;
+		if (c->died) {
+			break;
 		}
-		/* int pty = c->editor ? c->editor->cmdfd : c->app->cmdfd; */
 		FD_SET(c->term->cmdfd, &rd);
 		nfds = MAX(nfds, c->term->cmdfd);
 
@@ -1263,10 +1206,7 @@ main(int argc, char *argv[]) {
 
 		if (FD_ISSET(c->term->cmdfd, &rd)) {
 			if ((r = ttyread(c->term)) < 0 && errno == EIO) {
-				if (c->editor)
-					c->editor_died = true;
-				else
-					c->died = true;
+				c->died = true;
 				continue;
 			}
 		}

@@ -1,14 +1,14 @@
 include config.mk
 
 SRC = svt.c
-BIN = svt svt-editor svt-pager
-MANUALS = svt.1 svt-editor.1 svt-pager.1
+BIN = svt
+MANUALS = svt.1
 
 VERSION = $(shell git describe --always --dirty 2>/dev/null || echo "0.15-git")
 SVTCFLAGS += ${CFLAGS} -DVERSION=\"${VERSION}\"
 DEBUG_CFLAGS = ${SVTFLAGS} -UNDEBUG -O0 -g -ggdb -Wall -Wextra -Wno-unused-parameter
 
-all: svt svt-editor
+all: svt
 
 options:
 	@echo svt build options:
@@ -22,9 +22,6 @@ config.h:
 svt: config.h config.mk *.c *.h
 	${CC} ${SVTCFLAGS} ${SRC} ${SVTLDFLAGS} ${LIBS} -o $@
 
-svt-editor: svt-editor.c
-	${CC} ${SVTCFLAGS} $^ ${SVTLDFLAGS} -o $@
-
 man:
 	@for m in ${MANUALS}; do \
 		echo "Generating $$m"; \
@@ -37,7 +34,6 @@ debug: clean
 clean:
 	@echo cleaning
 	@rm -f svt
-	@rm -f svt-editor
 
 dist: clean
 	@echo creating dist tarball

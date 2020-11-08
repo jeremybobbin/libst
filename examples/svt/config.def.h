@@ -21,9 +21,9 @@ static KeyBinding bindings[] = {
 	{ { MOD, 'q', 'q',     }, { quit,           { NULL }                    } },
 	{ { MOD, CTRL('L'),    }, { redraw,         { NULL }                    } },
 	{ { MOD, 'r',          }, { redraw,         { NULL }                    } },
-	{ { MOD, 'e',          }, { copymode,       { "svt-editor" }           } },
-	{ { MOD, 'E',          }, { copymode,       { "svt-pager" }            } },
-	{ { MOD, '/',          }, { copymode,       { "svt-pager", "/" }       } },
+	{ { MOD, 'e',          }, { dump,           { "uncolored" }             } },
+	{ { MOD, 'E',          }, { dump,           {}                          } },
+	{ { MOD, '/',          }, { dump,           {}                          } },
 	{ { MOD, KEY_PPAGE,    }, { scrollback,     { "-1" }                    } },
 	{ { MOD, KEY_NPAGE,    }, { scrollback,     { "1"  }                    } },
 	{ { MOD, '?',          }, { create,         { "man svt", "svt help" } } },
@@ -74,7 +74,7 @@ static Button buttons[] = {
 
 static Cmd commands[] = {
 	/* create [cmd]: create a new window, run `cmd` in the shell if specified */
-	{ "create", { create,	{ NULL } } },
+	{ "dump", { dump,	{ NULL } } },
 	/* focus <win_id>: focus the window whose `SVT_WINDOW_ID` is `win_id` */
 };
 
