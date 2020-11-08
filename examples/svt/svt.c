@@ -157,8 +157,8 @@ static char *title;
 static bool is_utf8, has_default_colors;
 static short color_pairs_reserved, color_pairs_max, color_pair_current;
 static short *color2palette;
-short defaultfg = COLOR_WHITE;
-short defaultbg = COLOR_BLACK;
+short defaultfg = -1;
+short defaultbg = -1;
 
 #include "config.h"
 
@@ -324,6 +324,7 @@ static void
 init_colors(void)
 {
 	pair_content(0, &defaultfg, &defaultbg);
+	start_color();
 	has_default_colors = (use_default_colors() == OK);
 	color_pairs_max = MIN(COLOR_PAIRS, SHRT_MAX);
 	if (COLORS)
@@ -420,9 +421,9 @@ tdraw(Client *c, Term *t)
 			    || cell->fg != prev_cell->fg
 			    || cell->bg != prev_cell->bg) {
 				if (cell->fg == -1)
-					cell->fg = COLOR_WHITE;
+					cell->fg = defaultfg;
 				if (cell->bg == -1)
-					cell->bg = COLOR_BLACK;
+					cell->bg = defaultbg;
 				attrset(stattr_to_curses(cell->mode));
 				color_set(vt_color_get(t, cell->fg, cell->bg), NULL);
 			}
@@ -630,7 +631,6 @@ setup(void) {
 	shell = getshell();
 	setlocale(LC_CTYPE, "");
 	initscr();
-	start_color();
 	noecho();
 	nonl();
 	keypad(stdscr, TRUE);
