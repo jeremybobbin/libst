@@ -74,8 +74,11 @@ static Button buttons[] = {
 
 static Cmd commands[] = {
 	/* create [cmd]: create a new window, run `cmd` in the shell if specified */
-	{ "dump", { dump,	{ NULL } } },
-	/* focus <win_id>: focus the window whose `SVT_WINDOW_ID` is `win_id` */
+	{ "dump",   { dump,                              { NULL } } },
+	{ "scroll", { scrollback,                        { NULL } } },
+	{ "redraw", { redraw,                            { NULL } } },
+	{ "send",   { send,                              { NULL } } },
+	{ "quit",   { quit,                              { NULL } } },
 };
 
 static char const *keytable[KEY_MAX+1] = {
