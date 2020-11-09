@@ -150,7 +150,6 @@ static void zoom(const char *args[]);
 /* functions and variables available to layouts via config.h */
 static void cleanup(void);
 static Client* nextvisible(Client *c);
-static void resize(Client *c, int w, int h);
 extern Screen screen;
 static unsigned int waw, wah, wax, way;
 static Client *c = NULL;
@@ -475,24 +474,6 @@ term_urgent_handler(pid_t pid) {
 	printf("\a");
 	fflush(stdout);
 }
-static void
-resize_client(Client *c, int w, int h) {
-	bool resize_window = c->w != w || c->h != h;
-	if (resize_window) {
-		debug("resizing, w: %d h: %d\n", w, h);
-		c->w = w;
-		c->h = h;
-	}
-	if (resize_window) {
-		tresize(c->term, w, h);
-		ttyresize(c->term, w, h);
-	}
-}
-
-static void
-resize(Client *c, int w, int h) {
-	resize_client(c, w, h);
-}
 
 static void
 sigchld_handler(int sig) {
@@ -534,6 +515,7 @@ sigterm_handler(int sig) {
 static void
 resize_screen(void) {
 	struct winsize ws;
+	bool resize_window;
 
 	if (ioctl(0, TIOCGWINSZ, &ws) == -1) {
 		getmaxyx(stdscr, screen.h, screen.w);
@@ -545,7 +527,18 @@ resize_screen(void) {
 	debug("resize_screen(), w: %d h: %d\n", screen.w, screen.h);
 	resizeterm(screen.h, screen.w);
 	clear();
-	if (c) resize(c, screen.w, screen.h);
+
+	if (c == NULL) return;
+	resize_window = c->w != screen.w || c->h != screen.h;
+	if (resize_window) {
+		debug("resizing, w: %d h: %d\n", screen.w, screen.h);
+		c->w = screen.w;
+		c->h = screen.h;
+	}
+	if (resize_window) {
+		tresize(c->term, screen.w, screen.h);
+		ttyresize(c->term, screen.w, screen.h);
+	}
 }
 
 static KeyBinding*
