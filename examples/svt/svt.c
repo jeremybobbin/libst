@@ -40,8 +40,6 @@
 #include <libst.h>
 
 typedef struct {
-	float mfact;
-	unsigned int nmaster;
 	int history;
 	int w;
 	int h;
