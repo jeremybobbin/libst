@@ -77,10 +77,6 @@ typedef struct {
 #define LENGTH(arr) (sizeof(arr) / sizeof((arr)[0]))
 #define MAX(x, y)   ((x) > (y) ? (x) : (y))
 #define MIN(x, y)   ((x) < (y) ? (x) : (y))
-#define TRUERED(x)		(((x) & 0xff0000) >> 16)
-#define TRUEGREEN(x)		(((x) & 0xff00) >> 8)
-#define TRUEBLUE(x)		(((x) & 0xff))
-
 
 #ifdef NDEBUG
  #define debug(format, args...)
@@ -91,26 +87,17 @@ typedef struct {
 /* commands for use via fifo */
 static void create(const char *args[]);
 static void dump(const char *args[]);
-static void killclient(const char *args[]);
 static void quit(const char *args[]);
 static void redraw(const char *args[]);
 static void scrollback(const char *args[]);
 static void send(const char *args[]);
-static void togglemouse(const char *args[]);
-static void togglerunall(const char *args[]);
-static void toggletag(const char *args[]);
-static void toggleview(const char *args[]);
-static void viewprevtag(const char *args[]);
-static void view(const char *args[]);
-static void zoom(const char *args[]);
 
 /* functions and variables available to layouts via config.h */
 static void cleanup(void);
-static Client* nextvisible(Client *c);
 extern Screen screen;
 static Client *c = NULL;
 static char *title;
-static bool is_utf8, has_default_colors;
+static bool has_default_colors;
 static short color_pairs_reserved, color_pairs_max, color_pair_current;
 static short *color2palette;
 short defaultfg = -1;
@@ -121,17 +108,10 @@ short defaultbg = -1;
 /* global variables */
 static const char *svt_name = "svt";
 Screen screen = { .history = SCROLL_HISTORY };
-static Client *stack = NULL;
-static Client *lastsel = NULL;
-static Client *msel = NULL;
-static unsigned int seltags;
-static unsigned int tagset[2] = { 1, 1 };
-static bool mouse_events_enabled = ENABLE_MOUSE;
 static File cmdfifo = { .fd = -1 };
 static File ofile = { .fd = -1 };
 static const char *shell;
 static volatile sig_atomic_t running = true;
-static bool runinall = false;
 
 static void
 eprint(const char *errstr, ...) {
@@ -349,10 +329,6 @@ tdraw(Client *c, Term *t)
 			if (!prev_cell || cell->mode != prev_cell->mode
 			    || cell->fg != prev_cell->fg
 			    || cell->bg != prev_cell->bg) {
-				if (cell->fg == -1)
-					cell->fg = defaultfg;
-				if (cell->bg == -1)
-					cell->bg = defaultbg;
 				attrset(stattr_to_curses(cell->mode));
 				color_set(vt_color_get(t, cell->fg, cell->bg), NULL);
 			}
@@ -383,24 +359,6 @@ draw_content(Client *c) {
 static void
 draw(Client *c) {
 	draw_content(c);
-}
-
-static void
-draw_all(void) {
-	draw(c);
-}
-
-static void
-term_title_handler(pid_t pid, const char *title) {
-	if (title)
-		strncpy(c->title, title, sizeof(c->title) - 1);
-	c->title[title ? sizeof(c->title) - 1 : 0] = '\0';
-}
-
-static void
-term_urgent_handler(pid_t pid) {
-	printf("\a");
-	fflush(stdout);
 }
 
 static void
@@ -483,7 +441,6 @@ setup(void) {
 	noecho();
 	nonl();
 	keypad(stdscr, TRUE);
-	mouse_setup();
 	raw();
 	init_colors();
 	resize_screen();
@@ -529,12 +486,12 @@ static char *getcwd_by_pid(Client *c) {
 
 int
 event_handler(Term *term, Event e, Arg arg) {
-	Arg *kv = arg.v;
 	switch (e) {
 	case ST_BELL:
 		break;
 	case ST_RESET:
 		arg.s = "";
+		break;
 	case ST_TITLE:
 	case ST_ICONTITLE:
 		strncpy(c->title, arg.s ? arg.s : "", sizeof(c->title) - 1);
@@ -543,18 +500,20 @@ event_handler(Term *term, Event e, Arg arg) {
 		if (term == c->term) {
 			running = false;
 		}
+		break;
 	case ST_SET:
 		c->mode |= arg.ui;
 		break;
 	case ST_UNSET:
 		c->mode &= ~(arg.ui);
-		if ((c->mode & MODE_REVERSE) != (c->mode & MODE_REVERSE))
-			tfulldirt(term);
+		tfulldirt(term);
 		break;
 	case ST_POINTERMOTION:
 	case ST_CURSORSTYLE:
 	case ST_COPY:
 	case ST_COLORNAME:
+	case ST_CSI_ERROR:
+	case ST_STR_ERROR:
 		break;
 	}
 	return 0;
@@ -563,12 +522,7 @@ event_handler(Term *term, Event e, Arg arg) {
 static void
 create(const char *args[]) {
 	const char *pargs[4] = { shell, NULL };
-	char buf[8], *cwd = NULL;
-	const char *env[] = {
-		"SVT_WINDOW_ID", buf,
-		NULL
-	};
-
+	char *cwd = NULL;
 	if (args && args[0]) {
 		pargs[1] = "-c";
 		pargs[2] = args[0];
@@ -656,18 +610,12 @@ size_t tgetcontent(Term *t, char **buf, bool colored)
 						s += esclen;
 				}
 				if (!prev || curr->fg != prev->fg || curr->mode != prev->mode) {
-					if (curr->fg == -1)
-						esclen = sprintf(s, "\033[39m");
-					else
-						esclen = sprintf(s, "\033[38;5;%dm", curr->fg);
+					esclen = sprintf(s, "\033[38;5;%dm", curr->fg);
 					if (esclen > 0)
 						s += esclen;
 				}
 				if (!prev || curr->bg != prev->bg || curr->mode != prev->mode) {
-					if (curr->bg == -1)
-						esclen = sprintf(s, "\033[49m");
-					else
-						esclen = sprintf(s, "\033[48;5;%dm", curr->bg);
+					esclen = sprintf(s, "\033[48;5;%dm", curr->bg);
 					if (esclen > 0)
 						s += esclen;
 				}
@@ -755,12 +703,6 @@ static void
 send(const char *args[]) {
 	if (c && args && args[0])
 		ttywrite(c->term, args[0], strlen(args[0]), 0);
-}
-
-static void
-togglemouse(const char *args[]) {
-	mouse_events_enabled = !mouse_events_enabled;
-	mouse_setup();
 }
 
 static Cmd *
