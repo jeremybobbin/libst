@@ -59,7 +59,6 @@ typedef struct {
 typedef struct Client Client;
 struct Client {
 	Term *term;
-	volatile sig_atomic_t editor_died;
 	const char *cmd;
 	char title[255];
 	int order;
