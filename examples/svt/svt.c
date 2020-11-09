@@ -39,14 +39,6 @@
 #endif
 #include <libst.h>
 
-#ifdef PDCURSES
-int ESCDELAY;
-#endif
-
-#ifndef NCURSES_REENTRANT
-# define set_escdelay(d) (ESCDELAY = (d))
-#endif
-
 typedef struct {
 	float mfact;
 	unsigned int nmaster;
@@ -65,35 +57,12 @@ struct Client {
 	unsigned int scroll; /* how far back client is scrolled */
 };
 
-#define ALT(k)      ((k) + (161 - 'a'))
-#if defined CTRL && defined _AIX
-  #undef CTRL
-#endif
-#ifndef CTRL
-  #define CTRL(k)   ((k) & 0x1F)
-#endif
-#define CTRL_ALT(k) ((k) + (129 - 'a'))
-
 #define MAX_ARGS 8
 
 typedef struct {
 	void (*cmd)(const char *args[]);
 	const char *args[3];
 } Action;
-
-#define MAX_KEYS 3
-
-typedef unsigned int KeyCombo[MAX_KEYS];
-
-typedef struct {
-	KeyCombo keys;
-	Action action;
-} KeyBinding;
-
-typedef struct {
-	mmask_t mask;
-	Action action;
-} Button;
 
 typedef struct {
 	const char *name;
@@ -119,7 +88,7 @@ typedef struct {
  #define debug eprint
 #endif
 
-/* commands for use by keybindings */
+/* commands for use via fifo */
 static void create(const char *args[]);
 static void dump(const char *args[]);
 static void killclient(const char *args[]);
@@ -328,33 +297,6 @@ init_colors(void)
 	vt_color_reserve(COLOR_WHITE, COLOR_BLACK);
 }
 
-void tkeypress(Term *t, int keycode)
-{
-	/* vt_noscroll(t); */
-
-	if (keycode >= 0 && keycode <= KEY_MAX && keycode <= (sizeof(keytable) / sizeof(*keytable)) && keytable[keycode]) {
-		switch (keycode) {
-		case KEY_UP:
-		case KEY_DOWN:
-		case KEY_RIGHT:
-		case KEY_LEFT: {
-			char keyseq[3] = { '\e', (/* t->curskeymode ? */ 'O' /* : '['*/) , keytable[keycode][0] };
-			ttywrite(t, keyseq, sizeof keyseq, 0);
-			break;
-		}
-		default:
-			ttywrite(t, keytable[keycode], strlen(keytable[keycode]), 0);
-		}
-	} else if (keycode <= UCHAR_MAX) {
-		char c = keycode;
-		ttywrite(t, &c, 1, 0);
-	} else {
-#ifndef NDEBUG
-		fprintf(stderr, "unhandled key %#o\n", keycode);
-#endif
-	}
-}
-
 /* scroll for end user */
 void
 tscroll(Client *c, int n)
@@ -508,62 +450,6 @@ resize_screen(void) {
 		tresize(c->term, screen.w, screen.h);
 		ttyresize(c->term, screen.w, screen.h);
 	}
-}
-
-static KeyBinding*
-keybinding(KeyCombo keys, unsigned int keycount) {
-	for (unsigned int b = 0; b < LENGTH(bindings); b++) {
-		for (unsigned int k = 0; k < keycount; k++) {
-			if (keys[k] != bindings[b].keys[k])
-				break;
-			if (k == keycount - 1)
-				return &bindings[b];
-		}
-	}
-	return NULL;
-}
-
-static void
-keypress(int code) {
-	int key = -1;
-	unsigned int len = 1;
-	char buf[8] = { '\e' };
-
-	if (code == '\e') {
-		/* pass characters following escape to the underlying app */
-		nodelay(stdscr, TRUE);
-		for (int t; len < sizeof(buf) && (t = getch()) != ERR; len++) {
-			if (t > 255) {
-				key = t;
-				break;
-			}
-			buf[len] = t;
-		}
-		nodelay(stdscr, FALSE);
-	}
-
-	if (code == '\e')
-		ttywrite(c->term, buf, len, 0);
-	else
-		tkeypress(c->term, code);
-
-	if (key != -1)
-		tkeypress(c->term, key);
-	tscroll(c, 0);
-}
-
-static void
-mouse_setup(void) {
-#ifdef CONFIG_MOUSE
-	mmask_t mask = 0;
-
-	if (mouse_events_enabled) {
-		mask = BUTTON1_CLICKED | BUTTON2_CLICKED;
-		for (unsigned int i = 0; i < LENGTH(buttons); i++)
-			mask |= buttons[i].mask;
-	}
-	mousemask(mask, NULL);
-#endif /* CONFIG_MOUSE */
 }
 
 static bool
@@ -1018,8 +904,6 @@ parse_args(int argc, char *argv[]) {
 
 	if (name && (name = strrchr(name, '/')))
 		svt_name = name + 1;
-	if (!getenv("ESCDELAY"))
-		set_escdelay(100);
 	for (int arg = 1; arg < argc; arg++) {
 		if (argv[arg][0] != '-') {
 			const char *args[] = { argv[arg], NULL, NULL };
@@ -1036,25 +920,6 @@ parse_args(int argc, char *argv[]) {
 			case 'v':
 				puts("svt-"VERSION" © 2020 Jeremy Bobbin");
 				exit(EXIT_SUCCESS);
-			case 'M':
-				mouse_events_enabled = !mouse_events_enabled;
-				break;
-			case 'm': {
-				char *mod = argv[++arg];
-				if (mod[0] == '^' && mod[1])
-					*mod = CTRL(mod[1]);
-				for (unsigned int b = 0; b < LENGTH(bindings); b++)
-					if (bindings[b].keys[0] == MOD)
-						bindings[b].keys[0] = *mod;
-				break;
-			}
-			case 'd':
-				set_escdelay(atoi(argv[++arg]));
-				if (ESCDELAY < 50)
-					set_escdelay(50);
-				else if (ESCDELAY > 1000)
-					set_escdelay(1000);
-				break;
 			case 'h':
 				screen.history = atoi(argv[++arg]);
 				break;
@@ -1083,9 +948,7 @@ parse_args(int argc, char *argv[]) {
 
 int
 main(int argc, char *argv[]) {
-	KeyCombo keys;
-	unsigned int key_index = 0;
-	memset(keys, 0, sizeof(keys));
+	char buf[8];
 	sigset_t emptyset, blockset;
 
 	setenv("SVT", VERSION, 1);
@@ -1131,27 +994,10 @@ main(int argc, char *argv[]) {
 		}
 
 		if (FD_ISSET(STDIN_FILENO, &rd)) {
-			int code = getch();
-			if (code >= 0) {
-				keys[key_index++] = code;
-				KeyBinding *binding = NULL;
-				if ((binding = keybinding(keys, key_index))) {
-					unsigned int key_length = MAX_KEYS;
-					while (key_length > 1 && !binding->keys[key_length-1])
-						key_length--;
-					if (key_index == key_length) {
-						binding->action.cmd(binding->action.args);
-						key_index = 0;
-						memset(keys, 0, sizeof(keys));
-					}
-				} else {
-					key_index = 0;
-					memset(keys, 0, sizeof(keys));
-					keypress(code);
-				}
-			}
-			if (r == 1) /* no data available on pty's */
+			if ((r = read(STDIN_FILENO, buf, sizeof(buf))) < 0) {
 				continue;
+			}
+			ttywrite(c->term, buf, r, 1);
 		}
 
 		if (cmdfifo.fd != -1 && FD_ISSET(cmdfifo.fd, &rd))
