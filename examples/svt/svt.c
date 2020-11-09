@@ -61,7 +61,6 @@ struct Client {
 	Term *term;
 	const char *cmd;
 	char title[255];
-	volatile sig_atomic_t died;
 	unsigned int mode;
 	unsigned int scroll; /* how far back client is scrolled */
 };
@@ -468,22 +467,13 @@ sigchld_handler(int sig) {
 	int status;
 	pid_t pid;
 
-	while ((pid = waitpid(-1, &status, WNOHANG)) != 0) {
+	if ((pid = waitpid(-1, &status, WNOHANG)) != 0) {
 		if (pid == -1) {
-			if (errno == ECHILD) {
-				/* no more child processes */
-				break;
-			}
 			eprint("waitpid: %s\n", strerror(errno));
-			break;
 		}
 
-		debug("child with pid %d died\n", pid);
-
-		if (c->term->pid == pid) {
-			c->died = true;
-			break;
-		}
+		debug("child died\n");
+		running = false;
 	}
 
 	errno = errsv;
@@ -665,8 +655,7 @@ event_handler(Term *term, Event e, Arg arg) {
 		break;
 	case ST_EOF:
 		if (term == c->term) {
-			c->died = true;
-			break;
+			running = false;
 		}
 	case ST_SET:
 		c->mode |= arg.ui;
@@ -1128,9 +1117,6 @@ main(int argc, char *argv[]) {
 			nfds = cmdfifo.fd;
 		}
 
-		if (c->died) {
-			break;
-		}
 		FD_SET(c->term->cmdfd, &rd);
 		nfds = MAX(nfds, c->term->cmdfd);
 
@@ -1173,8 +1159,7 @@ main(int argc, char *argv[]) {
 
 		if (FD_ISSET(c->term->cmdfd, &rd)) {
 			if ((r = ttyread(c->term)) < 0 && errno == EIO) {
-				c->died = true;
-				continue;
+				break;
 			}
 		}
 		draw_content(c);
