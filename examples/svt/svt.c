@@ -275,21 +275,6 @@ init_colors(void)
 	vt_color_reserve(COLOR_WHITE, COLOR_BLACK);
 }
 
-/* scroll for end user */
-void
-tscroll(Client *c, int n)
-{
-	if (n) {
-		n += c->scroll;
-		n = MAX(n, 0);
-		/* user should not be able to loop back to the end of the ring buffer*/
-		c->scroll = MIN(n, c->term->maxrow - c->term->row);
-	} else {
-		c->scroll = 0;
-	}
-	tfulldirt(c->term);
-}
-
 int
 stattr_to_curses(enum glyph_attribute in)
 {
@@ -346,7 +331,7 @@ tdraw(Client *c, Term *t)
 		t->dirty[i] = false;
 	}
 
-	move(t->c.y, t->c.x);
+	move(t->c.y+c->scroll, t->c.x);
 }
 
 static void
@@ -630,6 +615,27 @@ size_t tgetcontent(Term *t, char **buf, bool colored)
 }
 
 static void
+tscroll(Client *c, int n)
+{
+	int limit = c->term->seen - c->term->row;
+	if (n) {
+		n += c->scroll;
+		n = MAX(n, 0);
+		/* user should not be able to loop back to the end of the ring buffer */
+		if (n >= limit) {
+			fprintf(stderr, "\a");
+			flash();
+			n = limit;
+		}
+	}
+	c->scroll = n;
+	tfulldirt(c->term);
+	tdraw(c, c->term);
+	curs_set(!(c->mode & MODE_HIDE));
+}
+
+
+static void
 dump(const char *args[]) {
 	size_t len;
 	char *buf, *cur;
@@ -677,14 +683,9 @@ redraw(const char *args[]) {
 
 static void
 scrollback(const char *args[]) {
-	if (!args[0] || atoi(args[0]) < 0)
-		tscroll(c, -c->term->row/2);
-	else
-		tscroll(c,  c->term->row/2);
-
-	tdraw(c, c->term);
-
-	curs_set(!(c->mode & MODE_HIDE));
+	if (!args[0])
+		return;
+	tscroll(c, atoi(args[0]));
 }
 
 static void
@@ -927,6 +928,7 @@ main(int argc, char *argv[]) {
 			if ((r = read(STDIN_FILENO, buf, sizeof(buf))) < 0) {
 				continue;
 			}
+			tscroll(c, 0);
 			ttywrite(c->term, buf, r, 1);
 		}
 
