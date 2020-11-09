@@ -107,7 +107,7 @@ short defaultbg = -1;
 static const char *svt_name = "svt";
 Screen screen = { .history = SCROLL_HISTORY };
 static File cmdfifo = { .fd = -1 };
-static File ofile = { .fd = -1 };
+static File dmpfile = { .fd = -1 };
 static const char *shell;
 static volatile sig_atomic_t running = true;
 
@@ -634,10 +634,10 @@ dump(const char *args[]) {
 	size_t len;
 	char *buf, *cur;
 	bool colored;
-	if (!c || ofile.name == NULL)
+	if (!c || dmpfile.name == NULL)
 		return;
 
-	if ((ofile.fd = open(ofile.name, O_RDWR|O_NONBLOCK|O_CREAT, 0600)) == -1) {
+	if ((dmpfile.fd = open(dmpfile.name, O_RDWR|O_NONBLOCK|O_CREAT, 0600)) == -1) {
 		error("%s\n", strerror(errno));
 		return;
 	}
@@ -651,7 +651,7 @@ dump(const char *args[]) {
 	len = tgetcontent(c->term, &buf, colored);
 	cur = buf;
 	while (len > 0) {
-		ssize_t res = write(ofile.fd, cur, len);
+		ssize_t res = write(dmpfile.fd, cur, len);
 		if (res < 0) {
 			if (errno == EAGAIN || errno == EINTR)
 				continue;
@@ -661,7 +661,7 @@ dump(const char *args[]) {
 		len -= res;
 	}
 	free(buf);
-	close(ofile.fd);
+	close(dmpfile.fd);
 }
 
 static void
@@ -823,7 +823,7 @@ static void
 usage(void) {
 	cleanup();
 	eprint("usage: svt [-v] [-M] [-m mod] [-d delay] [-h lines] [-t title] "
-	       "[-s status-fifo] [-c cmd-fifo] [-o dump-file] [cmd...]\n");
+	       "[-s status-fifo] [-c cmd-fifo] [-o dmpfile-file] [cmd...]\n");
 	exit(EXIT_FAILURE);
 }
 
@@ -865,8 +865,8 @@ parse_args(int argc, char *argv[]) {
 				break;
 			}
 			case 'o': {
-				const char *fname = ofile.name = argv[++arg];
-				setenv("SVT_OUT_FIFO", fname, 1);
+				const char *fname = dmpfile.name = argv[++arg];
+				setenv("SVT_DUMP_FILE", fname, 1);
 				break;
 			}
 			default:
