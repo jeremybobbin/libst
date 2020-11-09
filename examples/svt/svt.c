@@ -140,7 +140,6 @@ static void zoom(const char *args[]);
 static void cleanup(void);
 static Client* nextvisible(Client *c);
 extern Screen screen;
-static unsigned int waw, wah, wax, way;
 static Client *c = NULL;
 static char *title;
 static bool is_utf8, has_default_colors;
@@ -459,7 +458,6 @@ term_title_handler(pid_t pid, const char *title) {
 
 static void
 term_urgent_handler(pid_t pid) {
-	c->urgent = true;
 	printf("\a");
 	fflush(stdout);
 }
@@ -504,27 +502,19 @@ sigterm_handler(int sig) {
 static void
 resize_screen(void) {
 	struct winsize ws;
-	bool resize_window;
-
 	if (ioctl(0, TIOCGWINSZ, &ws) == -1) {
-		getmaxyx(stdscr, screen.h, screen.w);
-	} else {
-		screen.w = ws.ws_col;
-		screen.h = ws.ws_row;
+		error("%s\n", strerror(errno));
+		return;
+	}
+	if (ws.ws_col == screen.w && ws.ws_row == screen.h) {
+		return;
 	}
 
+	screen.w = ws.ws_col;
+	screen.h = ws.ws_row;
 	debug("resize_screen(), w: %d h: %d\n", screen.w, screen.h);
 	resizeterm(screen.h, screen.w);
-	clear();
-
-	if (c == NULL) return;
-	resize_window = c->w != screen.w || c->h != screen.h;
-	if (resize_window) {
-		debug("resizing, w: %d h: %d\n", screen.w, screen.h);
-		c->w = screen.w;
-		c->h = screen.h;
-	}
-	if (resize_window) {
+	if (c) {
 		tresize(c->term, screen.w, screen.h);
 		ttyresize(c->term, screen.w, screen.h);
 	}
@@ -712,7 +702,6 @@ create(const char *args[]) {
 	c = calloc(1, sizeof(Client));
 	if (!c)
 		return;
-	c->tags = tagset[seltags];
 
 	/* Term *term, int col, int row, int hist, int alt, int deffg, int defbg, int ts */
 	c->term = tnew(screen.w, screen.h, screen.history, 1, defaultfg, defaultbg, 8);
@@ -744,8 +733,6 @@ create(const char *args[]) {
 	if (args && args[2] && !strcmp(args[2], "$CWD"))
 		free(cwd);
 
-	c->x = wax;
-	c->y = way;
 	debug("client with pid %d forked\n", c->term->pid);
 }
 
