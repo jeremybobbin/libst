@@ -61,18 +61,8 @@ struct Client {
 	Term *term;
 	const char *cmd;
 	char title[255];
-	int order;
-	pid_t pid;
-	unsigned short int id;
-	unsigned short int x;
-	unsigned short int y;
-	unsigned short int w;
-	unsigned short int h;
-	bool minimized;
-	bool urgent;
 	volatile sig_atomic_t died;
 	unsigned int mode;
-	unsigned int tags;
 	unsigned int scroll; /* how far back client is scrolled */
 };
 
