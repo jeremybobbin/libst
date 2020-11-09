@@ -148,6 +148,7 @@ static void view(const char *args[]);
 static void zoom(const char *args[]);
 
 /* functions and variables available to layouts via config.h */
+static void cleanup(void);
 static Client* nextvisible(Client *c);
 static void resize(Client *c, int w, int h);
 extern Screen screen;
@@ -653,17 +654,15 @@ setup(void) {
 }
 
 static void
-destroy(Client *c) {
+cleanup(void) {
+	if (c == NULL)
+		return;
 	tfree(c->term);
 	if (!strcmp(c->cmd, shell))
 		quit(NULL);
 	else
 		create(NULL);
 	free(c);
-}
-
-static void
-cleanup(void) {
 	free(color2palette);
 	endwin();
 	if (cmdfifo.fd > 0)
@@ -887,8 +886,7 @@ dump(const char *args[]) {
 
 static void
 quit(const char *args[]) {
-	cleanup();
-	exit(EXIT_SUCCESS);
+	running = false;
 }
 
 static void
