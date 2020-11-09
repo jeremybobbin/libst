@@ -350,16 +350,6 @@ tdraw(Client *c, Term *t)
 }
 
 static void
-draw_content(Client *c) {
-	tdraw(c, c->term);
-}
-
-static void
-draw(Client *c) {
-	draw_content(c);
-}
-
-static void
 sigchld_handler(int sig) {
 	int errsv = errno;
 	int status;
@@ -692,7 +682,7 @@ scrollback(const char *args[]) {
 	else
 		tscroll(c,  c->term->row/2);
 
-	draw(c);
+	tdraw(c, c->term);
 
 	curs_set(!(c->mode & MODE_HIDE));
 }
@@ -948,7 +938,7 @@ main(int argc, char *argv[]) {
 				break;
 			}
 		}
-		draw_content(c);
+		tdraw(c, c->term);
 		refresh();
 	}
 
