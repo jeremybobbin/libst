@@ -369,18 +369,17 @@ resize_screen(void) {
 		error("%s\n", strerror(errno));
 		return;
 	}
-	if (ws.ws_col == screen.w && ws.ws_row == screen.h) {
-		return;
-	}
-
 	screen.w = ws.ws_col;
 	screen.h = ws.ws_row;
 	debug("resize_screen(), w: %d h: %d\n", screen.w, screen.h);
 	resizeterm(screen.h, screen.w);
-	if (c) {
-		tresize(c->term, screen.w, screen.h);
-		ttyresize(c->term, screen.w, screen.h);
-	}
+	if (c == NULL)
+		return;
+	tresize(c->term, screen.w, screen.h);
+	ttyresize(c->term, screen.w, screen.h);
+	clear();
+	tdraw(c, c->term);
+	refresh();
 }
 
 static bool
@@ -678,6 +677,9 @@ quit(const char *args[]) {
 static void
 redraw(const char *args[]) {
 	tfulldirt(c->term);
+	clear();
+	curs_set(!(c->mode & MODE_HIDE));
+	refresh();
 	resize_screen();
 }
 
