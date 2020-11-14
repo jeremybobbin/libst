@@ -642,7 +642,7 @@ dump(const char *args[]) {
 	if (!c || dmpfile.name == NULL)
 		return;
 
-	if ((dmpfile.fd = open(dmpfile.name, O_RDWR|O_NONBLOCK|O_CREAT, 0600)) == -1) {
+	if ((dmpfile.fd = open(dmpfile.name, O_WRONLY|O_CREAT, 0600)) == -1) {
 		error("%s\n", strerror(errno));
 		return;
 	}
