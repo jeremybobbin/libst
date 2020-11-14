@@ -204,9 +204,9 @@ vt_color_get(Term *t, int fg, int bg)
 	if (bg < 0)
 		bg = defaultbg;
 	else if (bg > COLORS) {
-		r = TRUERED(bg)   / 32;
-		g = TRUEGREEN(bg) / 32;
-		b = TRUEBLUE(bg)  / 64;
+		r = TRUERED(bg);
+		g = TRUEGREEN(bg);
+		b = TRUEBLUE(bg);
 		fg = colour_find_rgb(r, g, b);
 	}
 
