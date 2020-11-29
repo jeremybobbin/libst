@@ -379,6 +379,12 @@ resize_screen(void) {
 	ttyresize(c->term, screen.w, screen.h);
 	clear();
 	tdraw(c, c->term);
+	/* we double up here because NCurses assumes that
+	 * the terminal emulator is keeping track of whether
+	 * the cursor is hidden
+	 */
+	curs_set((c->mode & MODE_HIDE) ? 1 : 0);
+	curs_set((c->mode & MODE_HIDE) ? 0 : 1);
 	refresh();
 }
 
