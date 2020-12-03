@@ -454,14 +454,6 @@ cleanup(void) {
 		unlink(cmdfifo.name);
 }
 
-static char *getcwd_by_pid(Client *c) {
-	if (!c)
-		return NULL;
-	char buf[32];
-	snprintf(buf, sizeof buf, "/proc/%d/cwd", c->term->pid);
-	return realpath(buf, NULL);
-}
-
 int
 event_handler(Term *term, Event e, Arg arg) {
 	switch (e) {
@@ -499,13 +491,7 @@ event_handler(Term *term, Event e, Arg arg) {
 
 static void
 create(const char *args[]) {
-	const char *pargs[4] = { shell, NULL };
 	char *cwd = NULL;
-	if (args && args[0]) {
-		pargs[1] = "-c";
-		pargs[2] = args[0];
-		pargs[3] = NULL;
-	}
 	c = calloc(1, sizeof(Client));
 	if (!c)
 		return;
@@ -527,18 +513,9 @@ create(const char *args[]) {
 		c->cmd = shell;
 	}
 
-	if (args && args[1])
-		strncpy(c->title, args[1], sizeof(c->title));
-	c->title[sizeof(c->title)-1] = '\0';
-
-	if (args && args[2])
-		cwd = !strcmp(args[2], "$CWD") ? getcwd_by_pid(c) : (char*)args[2];
-
 	c->term->handler = event_handler;
 	/* ttynew(Term *term, char *cmd, char *iofname, char **args, int *in, int *out, int *err) */
-	ttynew(c->term, (char *)shell, NULL, (char **)pargs, NULL, NULL, NULL);
-	if (args && args[2] && !strcmp(args[2], "$CWD"))
-		free(cwd);
+	ttynew(c->term, (char *)shell, NULL, (char **)args, NULL, NULL, NULL);
 
 	debug("client with pid %d forked\n", c->term->pid);
 }
@@ -845,13 +822,12 @@ parse_args(int argc, char *argv[]) {
 		svt_name = name + 1;
 	for (int arg = 1; arg < argc; arg++) {
 		if (argv[arg][0] != '-') {
-			const char *args[] = { argv[arg], NULL, NULL };
 			if (!init) {
 				setup();
 				init = true;
 			}
-			create(args);
-			continue;
+			create((const char **)&argv[arg]);
+			break;
 		}
 		if (argv[arg][1] != 'v' && argv[arg][1] != 'M' && (arg + 1) >= argc)
 			usage();
