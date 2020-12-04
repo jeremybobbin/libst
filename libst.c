@@ -825,6 +825,13 @@ tscrollup(Term *term, int orig, int n, int copyhist)
 
 	/* dirty the ones which will remain on screen */
 
+	/* FIX BUG */
+	/* Try:
+	 * resize terminal to size LINES
+	 * run `man less`
+	 * type g$((LINES+1)) (g81 for example)
+	 * type g
+	 */
 	if (copyhist && orig == 0 && term->maxrow > (n + term->row)) {
 		/* clear the rows which will rise from beneath */
 		tclearregion(term, 0, term->row, term->col-1, term->row+n);
