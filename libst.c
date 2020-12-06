@@ -798,6 +798,7 @@ tscrolldown(Term *term, int orig, int n, int copyhist)
 
 	if (copyhist && orig == 0 && (term->maxrow > n + term->row)) {
 		tclearregion(term, 0, term->bot-n+1, term->col-1, term->bot);
+		/* shift the scroll-locked region upward */
 		for (i = term->bot-n+1; i < term->row-n; i++) {
 			temp = *tgetline(term, i);
 			*tgetline(term, i) = *tgetline(term, i+n);
@@ -1979,6 +1980,8 @@ eschandle(Term *term, uchar ascii)
 	case 'M': /* RI -- Reverse index */
 		if (term->c.y == term->top) {
 			tscrolldown(term, term->top, 1, 1);
+			tclearregion(term, 0, term->top, term->col-1,
+					term->top);
 		} else {
 			tmoveto(term, term->c.x, term->c.y-1);
 		}
