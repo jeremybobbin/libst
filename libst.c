@@ -796,7 +796,12 @@ tscrolldown(Term *term, int orig, int n, int copyhist)
 
 	tsetdirt(term, orig, term->bot-n);
 
-	if (copyhist && orig == 0 && (term->maxrow > n + term->row)) {
+	if (copyhist && orig == 0 && (term->maxrow > n + term->row) && (
+		/* we check that we are scrolling into initialized buffer
+		 * when first starting out, and we get a reverse index, we don't want to
+		 * try to render the tail of the ring buffer. */
+		term->seen >= term->maxrow ||  n <= (term->line - term->buf)
+	)) {
 		tclearregion(term, 0, term->bot-n+1, term->col-1, term->bot);
 		/* shift the scroll-locked region upward */
 		for (i = term->bot-n+1; i < term->row-n; i++) {
