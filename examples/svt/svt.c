@@ -473,9 +473,15 @@ event_handler(Term *term, Event e, Arg arg) {
 		break;
 	case ST_SET:
 		c->mode |= arg.ui;
+		if (arg.ui & MODE_HIDE) {
+			curs_set(0);
+		}
 		break;
 	case ST_UNSET:
 		c->mode &= ~(arg.ui);
+		if (arg.ui & MODE_HIDE) {
+			curs_set(1);
+		}
 		tfulldirt(term);
 		break;
 	case ST_POINTERMOTION:
