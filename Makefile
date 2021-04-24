@@ -39,6 +39,12 @@ dist: clean
 	tar -cf - libst-$(VERSION) | gzip > libst-$(VERSION).tar.gz
 	rm -rf libst-$(VERSION)
 
+dvtm: libst.a
+	root=$$PWD && \
+		cd examples/dvtm && \
+		make CFLAGS="-L$$root -I$$root"
+
+
 install: libst.a
 	mkdir -p $(DESTDIR)$(PREFIX)/bin
 	cp -f libst.a $(DESTDIR)$(PREFIX)/lib
