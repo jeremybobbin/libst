@@ -173,10 +173,6 @@ typedef struct {
 #define MAX(x, y)   ((x) > (y) ? (x) : (y))
 #define MIN(x, y)   ((x) < (y) ? (x) : (y))
 #define TAGMASK     ((1 << LENGTH(tags)) - 1)
-#define TRUERED(x)		(((x) & 0xff0000) >> 16)
-#define TRUEGREEN(x)		(((x) & 0xff00) >> 8)
-#define TRUEBLUE(x)		(((x) & 0xff))
-
 
 #ifdef NDEBUG
  #define debug(format, args...)
