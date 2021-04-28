@@ -520,6 +520,7 @@ create(const char *args[]) {
 	}
 
 	c->term->handler = event_handler;
+	/* TODO: handle case where cmd fails */
 	/* ttynew(Term *term, char *cmd, char *iofname, char **args, int *in, int *out, int *err) */
 	ttynew(c->term, (char *)shell, NULL, (char **)args, NULL, NULL, NULL);
 
