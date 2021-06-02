@@ -207,7 +207,7 @@ vt_color_get(Term *t, int fg, int bg)
 		r = TRUERED(bg);
 		g = TRUEGREEN(bg);
 		b = TRUEBLUE(bg);
-		fg = colour_find_rgb(r, g, b);
+		bg = colour_find_rgb(r, g, b);
 	}
 
 	if (!color2palette)
