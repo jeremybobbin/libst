@@ -42,17 +42,12 @@ enum selection_snap {
 	SNAP_LINE = 2
 };
 
-typedef unsigned char uchar;
-typedef unsigned int uint;
-typedef unsigned long ulong;
-typedef unsigned short ushort;
-
 typedef uint_least32_t Rune;
 
 #define Glyph Glyph_
 typedef struct {
 	Rune u;           /* character code */
-	ushort mode;      /* attribute flags */
+	unsigned short mode;      /* attribute flags */
 	uint32_t fg;      /* foreground  */
 	uint32_t bg;      /* background  */
 } Glyph;
@@ -61,7 +56,7 @@ typedef Glyph *Line;
 
 typedef union {
 	int i;
-	uint ui;
+	unsigned int ui;
 	float f;
 	void *v;
 	char *s;

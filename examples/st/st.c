@@ -20,6 +20,11 @@ char *argv0;
 #include "arg.h"
 #include <libst.h>
 
+typedef unsigned char uchar;
+typedef unsigned int uint;
+typedef unsigned short ushort;
+typedef unsigned long ulong;
+
 /* types used in config.h */
 typedef struct {
 	uint mod;

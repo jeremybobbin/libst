@@ -76,6 +76,9 @@ enum charset {
 	CS_FIN
 };
 
+typedef unsigned char uchar;
+typedef unsigned int uint;
+
 static void execsh(char *, char **);
 static void ttywriteraw(Term *term, const char *, size_t);
 
