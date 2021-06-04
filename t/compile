@@ -1,0 +1,18 @@
+#!/bin/sh -e
+if [ -f config.h ]; then
+	rm config.h
+fi
+
+make clean
+make "CFLAGS=-g -pedantic -Wall"
+
+root="$PWD"
+
+for e in examples/*; do
+	cd "$root/$e"
+	if [ -f config.h ]; then
+		rm config.h
+	fi
+	make clean
+	make CFLAGS="-g -pedantic -L$root -I$root"
+done

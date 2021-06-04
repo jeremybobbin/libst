@@ -42,26 +42,21 @@ enum selection_snap {
 	SNAP_LINE = 2
 };
 
-typedef unsigned char uchar;
-typedef unsigned int uint;
-typedef unsigned long ulong;
-typedef unsigned short ushort;
-
 typedef uint_least32_t Rune;
 
 #define Glyph Glyph_
 typedef struct {
-	Rune u;           /* character code */
-	ushort mode;      /* attribute flags */
-	uint32_t fg;      /* foreground  */
-	uint32_t bg;      /* background  */
+	Rune u;              /* character code */
+	unsigned short mode; /* attribute flags */
+	uint32_t fg;         /* foreground  */
+	uint32_t bg;         /* background  */
 } Glyph;
 
 typedef Glyph *Line;
 
 typedef union {
 	int i;
-	uint ui;
+	unsigned int ui;
 	float f;
 	void *v;
 	char *s;
@@ -210,13 +205,6 @@ void ttyresize(Term *, int, int);
 void ttywrite(Term *, const char *, size_t, int);
 
 void resettitle(Term *);
-
-void selclear(Term *);
-void selinit(Term *);
-void selstart(Term *, int, int, int);
-void selextend(Term *, int, int, int, int);
-int selected(Term *, int, int);
-char *getsel(Term *);
 
 size_t utf8encode(Rune, char *);
 
