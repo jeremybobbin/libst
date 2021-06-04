@@ -206,13 +206,6 @@ void ttywrite(Term *, const char *, size_t, int);
 
 void resettitle(Term *);
 
-void selclear(Term *);
-void selinit(Term *);
-void selstart(Term *, int, int, int);
-void selextend(Term *, int, int, int, int);
-int selected(Term *, int, int);
-char *getsel(Term *);
-
 size_t utf8encode(Rune, char *);
 
 void *xmalloc(size_t);
