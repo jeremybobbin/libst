@@ -1,0 +1,3 @@
+#!/bin/sh
+cd examples/
+./st/st -e ./dvtm/dvtm svt/svt
