@@ -182,6 +182,9 @@ static void xsetenv(void);
 static void xseturgency(int);
 static int evcol(XEvent *);
 static int evrow(XEvent *);
+static void *xmalloc(size_t);
+static void *xrealloc(void *, size_t);
+static char *xstrdup(char *);
 
 static void expose(XEvent *);
 static void visibility(XEvent *);
@@ -200,6 +203,7 @@ static int match(uint, uint);
 
 static void run(void);
 static void usage(void);
+static void die(const char *, ...);
 
 static void (*handler[LASTEvent])(XEvent *) = {
 	[KeyPress] = kpress,
@@ -263,6 +267,46 @@ static char *opt_name  = NULL;
 static char *opt_title = NULL;
 
 static int oldbutton = 3; /* button event on startup: 3 = release */
+
+void
+die(const char *errstr, ...)
+{
+	va_list ap;
+
+	va_start(ap, errstr);
+	vfprintf(stderr, errstr, ap);
+	va_end(ap);
+	exit(1);
+}
+
+void *
+xmalloc(size_t len)
+{
+	void *p;
+
+	if (!(p = malloc(len)))
+		die("malloc: %s\n", strerror(errno));
+
+	return p;
+}
+
+void *
+xrealloc(void *p, size_t len)
+{
+	if ((p = realloc(p, len)) == NULL)
+		die("realloc: %s\n", strerror(errno));
+
+	return p;
+}
+
+char *
+xstrdup(char *s)
+{
+	if ((s = strdup(s)) == NULL)
+		die("strdup: %s\n", strerror(errno));
+
+	return s;
+}
 
 void
 clipcopy(const Arg *dummy)
