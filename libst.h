@@ -185,8 +185,6 @@ struct Term {
 	STREscape strescseq;
 };
 
-void die(const char *, ...);
-
 void tprintscreen(Term *);
 void tsendbreak(Term *);
 void ttoggleprinter(Term *);
@@ -207,7 +205,3 @@ void ttywrite(Term *, const char *, size_t, int);
 void resettitle(Term *);
 
 size_t utf8encode(Rune, char *);
-
-void *xmalloc(size_t);
-void *xrealloc(void *, size_t);
-char *xstrdup(char *);

@@ -80,6 +80,7 @@ typedef unsigned char uchar;
 typedef unsigned int uint;
 
 static void execsh(char *, char **);
+static void die(const char *, ...);
 static void ttywriteraw(Term *term, const char *, size_t);
 
 static void csidump(Term *);
@@ -135,6 +136,9 @@ static char *base64dec(const char *);
 static char base64dec_getc(const char **);
 
 static ssize_t xwrite(int, const char *, size_t);
+static void *xmalloc(size_t);
+static void *xrealloc(void *, size_t);
+static char *xstrdup(char *);
 
 static uchar utfbyte[UTF_SIZ + 1] = {0x80,    0, 0xC0, 0xE0, 0xF0};
 static uchar utfmask[UTF_SIZ + 1] = {0xC0, 0x80, 0xE0, 0xF0, 0xF8};
